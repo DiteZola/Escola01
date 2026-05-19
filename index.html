@@ -92,339 +92,334 @@ const firebaseConfig = {
   appId: "1:622404754159:web:69b6eff5e97ca19522591a"
 };
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// Configurar persistência offline do Firestore
-db.enablePersistence({ synchronizeTabs: true })
-  .then(() => console.log('✅ Firestore persistence enabled'))
-  .catch(err => {
-    if (err.code === 'failed-precondition') {
-      console.log('⚠️ Multiple tabs open, persistence only in one tab');
-    } else if (err.code === 'unimplemented') {
-      console.log('⚠️ Browser does not support persistence');
-    }
-  });
+// Configurações do Firestore para melhor performance
+db.settings({ 
+  cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED 
+});
 
-// ==================== DATABASE SYNC SYSTEM ====================
+// ==================== SIMPLE DATABASE SYSTEM ====================
 const DB = {
   data: {},
-  lastSyncTime: 0,
   isSyncing: false,
+  listenerActive: false,
   unsubscribe: null,
-  syncIndicator: null,
 
-  // Collections to sync
-  collections: ['users', 'students', 'classes', 'turmas', 'turnos', 'disciplinas', 
-                'notas', 'mensagens', 'presencas', 'eventos', 'horarios', 'config'],
-
-  // Initialize local data structure
+  // Initialize data structure
   initData() {
-    if (!this.data.users) this.data.users = [];
-    if (!this.data.students) this.data.students = [];
-    if (!this.data.classes) this.data.classes = [];
-    if (!this.data.turmas) this.data.turmas = [];
-    if (!this.data.turnos) this.data.turnos = [];
-    if (!this.data.disciplinas) this.data.disciplinas = [];
-    if (!this.data.anoLetivo) this.data.anoLetivo = null;
-    if (!this.data.trimestres) this.data.trimestres = [];
-    if (!this.data.notas) this.data.notas = [];
-    if (!this.data.mensagens) this.data.mensagens = [];
-    if (!this.data.presencas) this.data.presencas = [];
-    if (!this.data.pautas) this.data.pautas = [];
-    if (!this.data.eventos) this.data.eventos = [];
-    if (!this.data.documentos) this.data.documentos = [];
-    if (!this.data.horarios) this.data.horarios = [];
-    if (!this.data.matriculas) this.data.matriculas = [];
-    if (!this.data.encarregados) this.data.encarregados = [];
-    if (!this.data.config) this.data.config = {};
-    if (!this.data.lastUpdate) this.data.lastUpdate = 0;
+    const defaults = {
+      users: [], students: [], classes: [], turmas: [], turnos: [],
+      disciplinas: [], notas: [], mensagens: [], presencas: [], eventos: [],
+      horarios: [], matriculas: [], encarregados: [], documentos: [],
+      trimestres: [], pautas: [], config: {}, anoLetivo: null, lastUpdate: 0
+    };
+    Object.keys(defaults).forEach(key => {
+      if (this.data[key] === undefined) this.data[key] = defaults[key];
+    });
+  },
+
+  // Generate unique ID
+  generateId() {
+    return 'id_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  },
+
+  // Show sync indicator
+  showStatus(type, msg) {
+    let el = document.getElementById('syncStatus');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'syncStatus';
+      el.style.cssText = 'position:fixed;bottom:20px;left:20px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;display:flex;align-items:center;gap:10px;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:all 0.3s;';
+      document.body.appendChild(el);
+    }
+    
+    const styles = {
+      loading: { bg: '#3b82f6', icon: 'fa-sync fa-spin' },
+      success: { bg: '#10b981', icon: 'fa-check-circle' },
+      error: { bg: '#ef4444', icon: 'fa-exclamation-triangle' },
+      offline: { bg: '#6b7280', icon: 'fa-cloud-slash' }
+    };
+    
+    const s = styles[type] || styles.loading;
+    el.style.background = s.bg;
+    el.style.color = '#fff';
+    el.innerHTML = `<i class="fas ${s.icon}"></i> <span>${msg}</span>`;
+    el.style.display = 'flex';
+    
+    if (type === 'success') {
+      setTimeout(() => { el.style.display = 'none'; }, 2500);
+    }
   },
 
   // Load from localStorage
   loadLocal() {
     try {
-      const saved = localStorage.getItem('nkalambata_db');
+      const saved = localStorage.getItem('nkalambata_escola');
       if (saved) {
         this.data = JSON.parse(saved);
       }
-      this.initData();
     } catch (e) {
-      console.error('Error loading local data:', e);
+      console.error('Erro ao carregar dados locais:', e);
       this.data = {};
-      this.initData();
     }
+    this.initData();
   },
 
   // Save to localStorage
   saveLocal() {
     try {
       this.data.lastUpdate = Date.now();
-      localStorage.setItem('nkalambata_db', JSON.stringify(this.data));
+      localStorage.setItem('nkalambata_escola', JSON.stringify(this.data));
+      console.log('💾 Dados salvos localmente');
     } catch (e) {
-      console.error('Error saving to localStorage:', e);
+      console.error('Erro ao salvar localmente:', e);
     }
   },
 
-  // Generate unique ID
-  generateId() {
-    return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
-  },
-
-  // Show sync status
-  showSyncStatus(status, message) {
-    let indicator = document.getElementById('syncIndicator');
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = 'syncIndicator';
-      indicator.style.cssText = 'position:fixed;bottom:20px;left:20px;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;z-index:9999;display:flex;align-items:center;gap:8px;transition:all 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
-      document.body.appendChild(indicator);
+  // ===== FIREBASE SYNC =====
+  
+  // Save to Firebase
+  async saveToFirebase() {
+    if (!navigator.onLine) {
+      console.log('📴 Offline - dados salvos apenas localmente');
+      return false;
     }
-    
-    const configs = {
-      syncing: { bg: '#3b82f6', icon: 'fa-sync fa-spin', text: 'Sincronizando...' },
-      success: { bg: '#10b981', icon: 'fa-check-circle', text: message || 'Sincronizado!' },
-      error: { bg: '#ef4444', icon: 'fa-exclamation-circle', text: message || 'Erro na sincronização' },
-      offline: { bg: '#6b7280', icon: 'fa-wifi-slash', text: 'Modo offline' }
-    };
-    
-    const config = configs[status] || configs.syncing;
-    indicator.style.background = config.bg;
-    indicator.style.color = '#fff';
-    indicator.innerHTML = `<i class="fas ${config.icon}"></i> ${config.text}`;
-    
-    if (status === 'success') {
-      setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
-      setTimeout(() => { indicator.style.opacity = '1'; indicator.style.display = 'none'; }, 2500);
-    } else {
-      indicator.style.display = 'flex';
-      indicator.style.opacity = '1';
+
+    try {
+      // Prepare data - remove photos to reduce size if needed
+      const dataToSave = JSON.parse(JSON.stringify(this.data));
+      dataToSave.lastUpdate = Date.now();
+      
+      console.log('☁️ Enviando dados para Firebase...');
+      
+      await db.collection('escola').doc('dados').set({
+        content: JSON.stringify(dataToSave),
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        version: dataToSave.lastUpdate,
+        userCount: dataToSave.users?.length || 0,
+        studentCount: dataToSave.students?.length || 0
+      });
+      
+      console.log('✅ Dados enviados para Firebase com sucesso!');
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao enviar para Firebase:', error);
+      throw error;
     }
   },
 
-  // SAVE with Firebase sync
-  async save(showStatus = true) {
-    // Always save locally first
-    this.saveLocal();
-    
-    // Then sync to Firebase
-    if (navigator.onLine) {
-      await this.syncToFirebase(showStatus);
+  // Load from Firebase
+  async loadFromFirebase() {
+    if (!navigator.onLine) {
+      console.log('📴 Offline - usando dados locais');
+      return false;
+    }
+
+    try {
+      console.log('☁️ Buscando dados do Firebase...');
+      
+      const doc = await db.collection('escola').doc('dados').get();
+      
+      if (doc.exists && doc.data().content) {
+        const remoteData = JSON.parse(doc.data().content);
+        const remoteVersion = doc.data().version || 0;
+        const localVersion = this.data.lastUpdate || 0;
+        
+        console.log(`📊 Versão local: ${localVersion}, Versão remota: ${remoteVersion}`);
+        
+        // Use remote if newer or if local is empty
+        if (remoteVersion > localVersion || !this.data.users || this.data.users.length === 0) {
+          console.log('📥 Usando dados do servidor (mais recentes)');
+          this.data = remoteData;
+          this.initData();
+          this.saveLocal();
+          return true;
+        } else {
+          console.log('📤 Dados locais são mais recentes');
+          return false;
+        }
+      } else {
+        console.log('📭 Nenhum dado encontrado no Firebase');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar do Firebase:', error);
+      throw error;
     }
   },
 
-  // Sync TO Firebase (upload)
-  async syncToFirebase(showStatus = true) {
+  // Start real-time listener
+  startListener() {
+    if (this.listenerActive) return;
+    
+    console.log('👂 Iniciando listener em tempo real...');
+    
+    this.unsubscribe = db.collection('escola').doc('dados')
+      .onSnapshot((doc) => {
+        if (doc.exists && doc.data().content) {
+          const remoteVersion = doc.data().version || 0;
+          const localVersion = this.data.lastUpdate || 0;
+          
+          // Only update if remote is newer and we're not currently saving
+          if (remoteVersion > localVersion && !this.isSyncing) {
+            console.log('🔄 Novos dados recebidos do servidor!');
+            
+            const remoteData = JSON.parse(doc.data().content);
+            
+            // Preserve current session
+            const session = typeof currentUser !== 'undefined' ? currentUser : null;
+            
+            this.data = remoteData;
+            this.initData();
+            this.saveLocal();
+            
+            // Restore session
+            if (session) {
+              const stillValid = this.data.users.find(u => u.id === session.id);
+              if (stillValid && typeof currentUser !== 'undefined') {
+                currentUser = stillValid;
+              }
+            }
+            
+            // Re-render UI
+            if (typeof render === 'function') {
+              render();
+            }
+            
+            this.showStatus('success', 'Dados actualizados!');
+          }
+        }
+      }, (error) => {
+        console.error('❌ Erro no listener:', error);
+      });
+    
+    this.listenerActive = true;
+  },
+
+  // Stop listener
+  stopListener() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+      this.listenerActive = false;
+      console.log('🛑 Listener parado');
+    }
+  },
+
+  // ===== MAIN SAVE FUNCTION =====
+  async save() {
     if (this.isSyncing) return;
     this.isSyncing = true;
     
-    if (showStatus) this.showSyncStatus('syncing');
-    
     try {
-      const dataToSync = {
-        ...this.data,
-        lastUpdate: Date.now(),
-        lastDevice: navigator.userAgent.substring(0, 50)
-      };
+      // Always save locally first
+      this.saveLocal();
       
-      // Remove large photo data for main sync to avoid quota issues
-      // Photos will be stored separately if needed
-      const syncData = JSON.parse(JSON.stringify(dataToSync));
-      
-      await db.collection('schoolData').doc('nkalambata').set({
-        data: JSON.stringify(syncData),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        version: Date.now()
-      }, { merge: false });
-      
-      if (showStatus) this.showSyncStatus('success', 'Dados sincronizados!');
-      console.log('✅ Data synced to Firebase at', new Date().toLocaleTimeString());
-      
+      // Then try to sync to Firebase
+      if (navigator.onLine) {
+        this.showStatus('loading', 'Sincronizando...');
+        await this.saveToFirebase();
+        this.showStatus('success', 'Sincronizado!');
+      }
     } catch (error) {
-      console.error('❌ Firebase sync error:', error);
-      if (showStatus) this.showSyncStatus('error', 'Erro ao sincronizar: ' + error.message);
+      console.error('Erro ao salvar:', error);
+      this.showStatus('error', 'Erro ao sincronizar');
     } finally {
       this.isSyncing = false;
     }
   },
 
-  // Sync FROM Firebase (download) - one time
-  async syncFromFirebase() {
+  // ===== FORCE SYNC =====
+  async forceSync() {
+    if (!navigator.onLine) {
+      this.showStatus('offline', 'Sem conexão');
+      return false;
+    }
+    
+    this.showStatus('loading', 'Sincronizando...');
+    
     try {
-      this.showSyncStatus('syncing', 'Carregando dados...');
+      // First, try to get latest from server
+      const updated = await this.loadFromFirebase();
       
-      const doc = await db.collection('schoolData').doc('nkalambata').get();
-      
-      if (doc.exists) {
-        const remoteData = JSON.parse(doc.data().data);
-        const remoteVersion = doc.data().version || 0;
-        const localVersion = this.data.lastUpdate || 0;
-        
-        console.log(`📊 Local version: ${localVersion}, Remote version: ${remoteVersion}`);
-        
-        // If remote is newer or local is empty, use remote
-        if (remoteVersion > localVersion || this.data.users.length === 0) {
-          console.log('📥 Using remote data (newer)');
-          this.data = remoteData;
-          this.initData();
-          this.saveLocal();
-          this.showSyncStatus('success', 'Dados carregados do servidor!');
-          return true;
-        } else {
-          console.log('📤 Local data is current');
-          this.showSyncStatus('success', 'Dados actualizados!');
-          return false;
-        }
-      } else {
-        console.log('📭 No remote data found, using local');
-        // If no remote data but we have local data, push it
-        if (this.data.users && this.data.users.length > 0) {
-          await this.syncToFirebase(false);
-        }
-        this.showSyncStatus('success');
-        return false;
+      if (!updated) {
+        // If local is newer, push to server
+        await this.saveToFirebase();
       }
+      
+      this.showStatus('success', 'Sincronização completa!');
+      return true;
     } catch (error) {
-      console.error('❌ Error loading from Firebase:', error);
-      this.showSyncStatus('error', 'Erro ao carregar dados');
+      this.showStatus('error', 'Erro: ' + error.message);
       return false;
     }
   },
 
-  // Start real-time listener
-  startRealtimeSync() {
-    if (this.unsubscribe) {
-      this.unsubscribe();
-    }
-    
-    console.log('🔄 Starting real-time sync listener...');
-    
-    this.unsubscribe = db.collection('schoolData').doc('nkalambata')
-      .onSnapshot(
-        (doc) => {
-          if (doc.exists) {
-            const remoteData = JSON.parse(doc.data().data);
-            const remoteVersion = doc.data().version || 0;
-            const localVersion = this.data.lastUpdate || 0;
-            
-            // Only update if remote is newer AND we're not currently syncing
-            if (remoteVersion > localVersion && !this.isSyncing) {
-              console.log('📥 Real-time update received!', new Date().toLocaleTimeString());
-              
-              // Preserve current user session
-              const currentSession = currentUser ? { ...currentUser } : null;
-              
-              this.data = remoteData;
-              this.initData();
-              this.saveLocal();
-              
-              // Restore user session if they're still valid
-              if (currentSession) {
-                const stillExists = this.data.users.find(u => u.id === currentSession.id && u.ativo);
-                if (stillExists) {
-                  currentUser = stillExists;
-                }
-              }
-              
-              // Re-render the UI
-              if (typeof render === 'function') {
-                render();
-              }
-              
-              this.showSyncStatus('success', 'Novos dados recebidos!');
-            }
-          }
-        },
-        (error) => {
-          console.error('❌ Real-time sync error:', error);
-          this.showSyncStatus('error', 'Erro na sincronização em tempo real');
-        }
-      );
-  },
-
-  // Stop real-time listener
-  stopRealtimeSync() {
-    if (this.unsubscribe) {
-      this.unsubscribe();
-      this.unsubscribe = null;
-      console.log('🛑 Real-time sync stopped');
-    }
-  },
-
-  // Full initialization
+  // ===== INITIALIZATION =====
   async init() {
-    console.log('🚀 Initializing database...');
+    console.log('🚀 Iniciando sistema...');
     
-    // 1. Load local data first (for offline support)
+    // 1. Load local data first
     this.loadLocal();
+    console.log(`📦 Dados locais: ${this.data.users?.length || 0} usuários`);
     
     // 2. If online, sync with Firebase
     if (navigator.onLine) {
-      const updated = await this.syncFromFirebase();
-      if (updated && typeof render === 'function') {
-        render();
+      try {
+        this.showStatus('loading', 'Conectando ao servidor...');
+        
+        const updated = await this.loadFromFirebase();
+        
+        if (updated) {
+          this.showStatus('success', 'Dados carregados do servidor!');
+          if (typeof render === 'function') render();
+        } else if (this.data.users && this.data.users.length > 0) {
+          // Push local data to server if it doesn't exist remotely
+          await this.saveToFirebase();
+          this.showStatus('success', 'Dados sincronizados!');
+        } else {
+          this.showStatus('success', 'Conectado!');
+        }
+        
+        // Start real-time listener
+        this.startListener();
+        
+      } catch (error) {
+        console.error('Erro na inicialização:', error);
+        this.showStatus('error', 'Erro ao conectar');
       }
-      
-      // 3. Start real-time listener
-      this.startRealtimeSync();
     } else {
-      this.showSyncStatus('offline');
+      this.showStatus('offline', 'Modo offline');
     }
     
-    // 4. Listen for online/offline changes
+    // 3. Listen for network changes
     window.addEventListener('online', async () => {
-      console.log('🌐 Back online!');
-      this.showSyncStatus('syncing', 'Reconectando...');
+      console.log('🌐 Conexão restaurada!');
+      this.showStatus('loading', 'Reconectando...');
       
-      // Sync local changes first
-      await this.syncToFirebase(false);
-      
-      // Then get latest from server
-      await this.syncFromFirebase();
-      
-      // Start real-time sync
-      this.startRealtimeSync();
-      
-      if (typeof render === 'function') {
-        render();
+      try {
+        await this.forceSync();
+        this.startListener();
+        if (typeof render === 'function') render();
+      } catch (e) {
+        console.error('Erro ao reconectar:', e);
       }
     });
     
     window.addEventListener('offline', () => {
-      console.log('📴 Gone offline');
-      this.showSyncStatus('offline');
-      this.stopRealtimeSync();
+      console.log('📴 Sem conexão');
+      this.showStatus('offline', 'Modo offline');
+      this.stopListener();
     });
     
-    console.log('✅ Database initialized');
-  },
-
-  // Force sync (manual)
-  async forceSync() {
-    if (!navigator.onLine) {
-      this.showSyncStatus('offline');
-      return false;
-    }
-    
-    this.showSyncStatus('syncing', 'Forçando sincronização...');
-    
-    try {
-      // Push local first
-      await this.syncToFirebase(false);
-      
-      // Then pull latest
-      await this.syncFromFirebase();
-      
-      this.showSyncStatus('success', 'Sincronização completa!');
-      return true;
-    } catch (e) {
-      this.showSyncStatus('error');
-      return false;
-    }
+    console.log('✅ Sistema iniciado!');
   }
 };
 
-// Initialize DB
+// Initialize on page load
 DB.init();
 
 // ==================== APP STATE ====================
@@ -629,7 +624,7 @@ function render() {
 async function checkFirebaseAndRender() {
   try {
     if (navigator.onLine) {
-      const updated = await DB.syncFromFirebase();
+      const updated = await DB.loadFromFirebase();
       if (updated) {
         console.log('📥 Found data in Firebase, loaded successfully');
       }
@@ -820,7 +815,7 @@ function bindSetupEvents() {
       
       // Start real-time sync
       if (navigator.onLine) {
-        DB.startRealtimeSync();
+        DB.startListener();
       }
       
       render();
@@ -2608,9 +2603,9 @@ window.restaurarBackup = async (event) => {
       
       // Sync to Firebase immediately
       if (navigator.onLine) {
-        DB.showSyncStatus('syncing', 'Enviando backup para o servidor...');
-        await DB.syncToFirebase(false);
-        DB.showSyncStatus('success', 'Backup restaurado e sincronizado!');
+        DB.showStatus('loading', 'Enviando backup para o servidor...');
+        await DB.saveToFirebase();
+        DB.showStatus('success', 'Backup restaurado e sincronizado!');
       }
       
       showToast('Backup restaurado com sucesso!');
