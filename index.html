@@ -91,16 +91,35 @@ const firebaseConfig = {
   messagingSenderId: "622404754159",
   appId: "1:622404754159:web:69b6eff5e97ca19522591a"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-db.enablePersistence().catch(err => console.log('Persistence error:', err));
 
-// ==================== LOCAL DB (IndexedDB + localStorage fallback) ====================
+// Configurar persistência offline do Firestore
+db.enablePersistence({ synchronizeTabs: true })
+  .then(() => console.log('✅ Firestore persistence enabled'))
+  .catch(err => {
+    if (err.code === 'failed-precondition') {
+      console.log('⚠️ Multiple tabs open, persistence only in one tab');
+    } else if (err.code === 'unimplemented') {
+      console.log('⚠️ Browser does not support persistence');
+    }
+  });
+
+// ==================== DATABASE SYNC SYSTEM ====================
 const DB = {
   data: {},
-  init() {
-    const saved = localStorage.getItem('nkalambata_db');
-    if (saved) this.data = JSON.parse(saved);
+  lastSyncTime: 0,
+  isSyncing: false,
+  unsubscribe: null,
+  syncIndicator: null,
+
+  // Collections to sync
+  collections: ['users', 'students', 'classes', 'turmas', 'turnos', 'disciplinas', 
+                'notas', 'mensagens', 'presencas', 'eventos', 'horarios', 'config'],
+
+  // Initialize local data structure
+  initData() {
     if (!this.data.users) this.data.users = [];
     if (!this.data.students) this.data.students = [];
     if (!this.data.classes) this.data.classes = [];
@@ -116,39 +135,296 @@ const DB = {
     if (!this.data.eventos) this.data.eventos = [];
     if (!this.data.documentos) this.data.documentos = [];
     if (!this.data.horarios) this.data.horarios = [];
-    if (!this.data.syncQueue) this.data.syncQueue = [];
     if (!this.data.matriculas) this.data.matriculas = [];
     if (!this.data.encarregados) this.data.encarregados = [];
+    if (!this.data.config) this.data.config = {};
+    if (!this.data.lastUpdate) this.data.lastUpdate = 0;
   },
-  save() {
-    localStorage.setItem('nkalambata_db', JSON.stringify(this.data));
-    this.syncToFirebase();
-  },
-  async syncToFirebase() {
-    if (!navigator.onLine) return;
+
+  // Load from localStorage
+  loadLocal() {
     try {
-      const batch = db.batch();
-      const docRef = db.collection('schoolData').doc('main');
-      batch.set(docRef, { data: JSON.stringify(this.data), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-      await batch.commit();
-    } catch(e) { console.log('Sync error:', e); }
+      const saved = localStorage.getItem('nkalambata_db');
+      if (saved) {
+        this.data = JSON.parse(saved);
+      }
+      this.initData();
+    } catch (e) {
+      console.error('Error loading local data:', e);
+      this.data = {};
+      this.initData();
+    }
   },
-  async loadFromFirebase() {
-    if (!navigator.onLine) return;
+
+  // Save to localStorage
+  saveLocal() {
     try {
-      const doc = await db.collection('schoolData').doc('main').get();
+      this.data.lastUpdate = Date.now();
+      localStorage.setItem('nkalambata_db', JSON.stringify(this.data));
+    } catch (e) {
+      console.error('Error saving to localStorage:', e);
+    }
+  },
+
+  // Generate unique ID
+  generateId() {
+    return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+  },
+
+  // Show sync status
+  showSyncStatus(status, message) {
+    let indicator = document.getElementById('syncIndicator');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'syncIndicator';
+      indicator.style.cssText = 'position:fixed;bottom:20px;left:20px;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;z-index:9999;display:flex;align-items:center;gap:8px;transition:all 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+      document.body.appendChild(indicator);
+    }
+    
+    const configs = {
+      syncing: { bg: '#3b82f6', icon: 'fa-sync fa-spin', text: 'Sincronizando...' },
+      success: { bg: '#10b981', icon: 'fa-check-circle', text: message || 'Sincronizado!' },
+      error: { bg: '#ef4444', icon: 'fa-exclamation-circle', text: message || 'Erro na sincronização' },
+      offline: { bg: '#6b7280', icon: 'fa-wifi-slash', text: 'Modo offline' }
+    };
+    
+    const config = configs[status] || configs.syncing;
+    indicator.style.background = config.bg;
+    indicator.style.color = '#fff';
+    indicator.innerHTML = `<i class="fas ${config.icon}"></i> ${config.text}`;
+    
+    if (status === 'success') {
+      setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+      setTimeout(() => { indicator.style.opacity = '1'; indicator.style.display = 'none'; }, 2500);
+    } else {
+      indicator.style.display = 'flex';
+      indicator.style.opacity = '1';
+    }
+  },
+
+  // SAVE with Firebase sync
+  async save(showStatus = true) {
+    // Always save locally first
+    this.saveLocal();
+    
+    // Then sync to Firebase
+    if (navigator.onLine) {
+      await this.syncToFirebase(showStatus);
+    }
+  },
+
+  // Sync TO Firebase (upload)
+  async syncToFirebase(showStatus = true) {
+    if (this.isSyncing) return;
+    this.isSyncing = true;
+    
+    if (showStatus) this.showSyncStatus('syncing');
+    
+    try {
+      const dataToSync = {
+        ...this.data,
+        lastUpdate: Date.now(),
+        lastDevice: navigator.userAgent.substring(0, 50)
+      };
+      
+      // Remove large photo data for main sync to avoid quota issues
+      // Photos will be stored separately if needed
+      const syncData = JSON.parse(JSON.stringify(dataToSync));
+      
+      await db.collection('schoolData').doc('nkalambata').set({
+        data: JSON.stringify(syncData),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        version: Date.now()
+      }, { merge: false });
+      
+      if (showStatus) this.showSyncStatus('success', 'Dados sincronizados!');
+      console.log('✅ Data synced to Firebase at', new Date().toLocaleTimeString());
+      
+    } catch (error) {
+      console.error('❌ Firebase sync error:', error);
+      if (showStatus) this.showSyncStatus('error', 'Erro ao sincronizar: ' + error.message);
+    } finally {
+      this.isSyncing = false;
+    }
+  },
+
+  // Sync FROM Firebase (download) - one time
+  async syncFromFirebase() {
+    try {
+      this.showSyncStatus('syncing', 'Carregando dados...');
+      
+      const doc = await db.collection('schoolData').doc('nkalambata').get();
+      
       if (doc.exists) {
         const remoteData = JSON.parse(doc.data().data);
-        if (remoteData.users && remoteData.users.length >= this.data.users.length) {
+        const remoteVersion = doc.data().version || 0;
+        const localVersion = this.data.lastUpdate || 0;
+        
+        console.log(`📊 Local version: ${localVersion}, Remote version: ${remoteVersion}`);
+        
+        // If remote is newer or local is empty, use remote
+        if (remoteVersion > localVersion || this.data.users.length === 0) {
+          console.log('📥 Using remote data (newer)');
           this.data = remoteData;
-          this.save();
+          this.initData();
+          this.saveLocal();
+          this.showSyncStatus('success', 'Dados carregados do servidor!');
+          return true;
+        } else {
+          console.log('📤 Local data is current');
+          this.showSyncStatus('success', 'Dados actualizados!');
+          return false;
         }
+      } else {
+        console.log('📭 No remote data found, using local');
+        // If no remote data but we have local data, push it
+        if (this.data.users && this.data.users.length > 0) {
+          await this.syncToFirebase(false);
+        }
+        this.showSyncStatus('success');
+        return false;
       }
-    } catch(e) { console.log('Load from Firebase error:', e); }
+    } catch (error) {
+      console.error('❌ Error loading from Firebase:', error);
+      this.showSyncStatus('error', 'Erro ao carregar dados');
+      return false;
+    }
   },
-  generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
+
+  // Start real-time listener
+  startRealtimeSync() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+    
+    console.log('🔄 Starting real-time sync listener...');
+    
+    this.unsubscribe = db.collection('schoolData').doc('nkalambata')
+      .onSnapshot(
+        (doc) => {
+          if (doc.exists) {
+            const remoteData = JSON.parse(doc.data().data);
+            const remoteVersion = doc.data().version || 0;
+            const localVersion = this.data.lastUpdate || 0;
+            
+            // Only update if remote is newer AND we're not currently syncing
+            if (remoteVersion > localVersion && !this.isSyncing) {
+              console.log('📥 Real-time update received!', new Date().toLocaleTimeString());
+              
+              // Preserve current user session
+              const currentSession = currentUser ? { ...currentUser } : null;
+              
+              this.data = remoteData;
+              this.initData();
+              this.saveLocal();
+              
+              // Restore user session if they're still valid
+              if (currentSession) {
+                const stillExists = this.data.users.find(u => u.id === currentSession.id && u.ativo);
+                if (stillExists) {
+                  currentUser = stillExists;
+                }
+              }
+              
+              // Re-render the UI
+              if (typeof render === 'function') {
+                render();
+              }
+              
+              this.showSyncStatus('success', 'Novos dados recebidos!');
+            }
+          }
+        },
+        (error) => {
+          console.error('❌ Real-time sync error:', error);
+          this.showSyncStatus('error', 'Erro na sincronização em tempo real');
+        }
+      );
+  },
+
+  // Stop real-time listener
+  stopRealtimeSync() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+      console.log('🛑 Real-time sync stopped');
+    }
+  },
+
+  // Full initialization
+  async init() {
+    console.log('🚀 Initializing database...');
+    
+    // 1. Load local data first (for offline support)
+    this.loadLocal();
+    
+    // 2. If online, sync with Firebase
+    if (navigator.onLine) {
+      const updated = await this.syncFromFirebase();
+      if (updated && typeof render === 'function') {
+        render();
+      }
+      
+      // 3. Start real-time listener
+      this.startRealtimeSync();
+    } else {
+      this.showSyncStatus('offline');
+    }
+    
+    // 4. Listen for online/offline changes
+    window.addEventListener('online', async () => {
+      console.log('🌐 Back online!');
+      this.showSyncStatus('syncing', 'Reconectando...');
+      
+      // Sync local changes first
+      await this.syncToFirebase(false);
+      
+      // Then get latest from server
+      await this.syncFromFirebase();
+      
+      // Start real-time sync
+      this.startRealtimeSync();
+      
+      if (typeof render === 'function') {
+        render();
+      }
+    });
+    
+    window.addEventListener('offline', () => {
+      console.log('📴 Gone offline');
+      this.showSyncStatus('offline');
+      this.stopRealtimeSync();
+    });
+    
+    console.log('✅ Database initialized');
+  },
+
+  // Force sync (manual)
+  async forceSync() {
+    if (!navigator.onLine) {
+      this.showSyncStatus('offline');
+      return false;
+    }
+    
+    this.showSyncStatus('syncing', 'Forçando sincronização...');
+    
+    try {
+      // Push local first
+      await this.syncToFirebase(false);
+      
+      // Then pull latest
+      await this.syncFromFirebase();
+      
+      this.showSyncStatus('success', 'Sincronização completa!');
+      return true;
+    } catch (e) {
+      this.showSyncStatus('error');
+      return false;
+    }
+  }
 };
 
+// Initialize DB
 DB.init();
 
 // ==================== APP STATE ====================
@@ -311,8 +587,32 @@ function hasDirector() {
 }
 
 // ==================== RENDER ENGINE ====================
+// Track if we've checked Firebase initially
+let initialSyncDone = false;
+
 function render() {
   const app = document.getElementById('app');
+  
+  // Show loading state on first load if online and hasn't synced yet
+  if (!initialSyncDone && navigator.onLine && isFirstRun() && !hasDirector()) {
+    app.innerHTML = `
+      <div class="login-bg flex items-center justify-center p-4" style="min-height:100vh">
+        <div class="glass rounded-2xl p-8 w-full max-w-md text-white text-center">
+          <div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-sync fa-spin text-4xl"></i>
+          </div>
+          <h1 class="text-xl font-bold">Complexo Escolar Nkalambata</h1>
+          <p class="text-blue-200 mt-4">Verificando dados no servidor...</p>
+          <p class="text-xs text-blue-300 mt-2">Por favor aguarde</p>
+        </div>
+      </div>
+    `;
+    
+    // Check Firebase for existing data
+    checkFirebaseAndRender();
+    return;
+  }
+  
   if (isFirstRun() && !hasDirector()) {
     app.innerHTML = renderSetupPage();
     bindSetupEvents();
@@ -323,6 +623,23 @@ function render() {
     app.innerHTML = renderMainApp();
     bindMainEvents();
   }
+}
+
+// Check if there's data in Firebase before showing setup page
+async function checkFirebaseAndRender() {
+  try {
+    if (navigator.onLine) {
+      const updated = await DB.syncFromFirebase();
+      if (updated) {
+        console.log('📥 Found data in Firebase, loaded successfully');
+      }
+    }
+  } catch (e) {
+    console.log('Could not check Firebase:', e);
+  }
+  
+  initialSyncDone = true;
+  render();
 }
 
 // ==================== SETUP PAGE (First Director Registration) ====================
@@ -455,15 +772,22 @@ function bindSetupEvents() {
       document.getElementById('setupPhoto').innerHTML = `<img src="${setupPhotoData}" alt="">`;
     }
   });
-  document.getElementById('btnSetup')?.addEventListener('click', () => {
+  document.getElementById('btnSetup')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnSetup');
     const nome = document.getElementById('s_nome').value.trim();
     const bi = document.getElementById('s_bi').value.trim();
     const username = document.getElementById('s_username').value.trim();
     const password = document.getElementById('s_password').value;
     const password2 = document.getElementById('s_password2').value;
+    
     if (!nome || !bi || !username || !password) return showToast('Preencha todos os campos obrigatorios!', 'error');
     if (password !== password2) return showToast('As senhas nao coincidem!', 'error');
     if (password.length < 6) return showToast('A senha deve ter no minimo 6 caracteres!', 'error');
+    
+    // Disable button during save
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registando e sincronizando...';
+    
     const user = {
       id: DB.generateId(),
       nome, bi,
@@ -486,10 +810,24 @@ function bindSetupEvents() {
       dataCriacao: new Date().toISOString(),
       ativo: true
     };
+    
     DB.data.users.push(user);
-    DB.save();
-    showToast('Director Geral registado com sucesso! Faca login para continuar.');
-    render();
+    
+    // Save and sync
+    try {
+      await DB.save();
+      showToast('Director Geral registado com sucesso! Dados sincronizados.');
+      
+      // Start real-time sync
+      if (navigator.onLine) {
+        DB.startRealtimeSync();
+      }
+      
+      render();
+    } catch (e) {
+      showToast('Erro ao guardar. Os dados foram salvos localmente.', 'warning');
+      render();
+    }
   });
 }
 
@@ -504,9 +842,10 @@ function renderLoginPage() {
         </div>
         <h1 class="text-2xl font-bold">Complexo Escolar Nkalambata</h1>
         <p class="text-blue-200 mt-2">Sistema de Gestao Escolar</p>
-        <div class="mt-3 flex items-center justify-center gap-2">
+        <div class="mt-3 flex items-center justify-center gap-2 cursor-pointer" id="loginSyncStatus" title="Clique para sincronizar">
           <span class="online-indicator ${navigator.onLine ? 'online' : 'offline'}"></span>
-          <span class="text-xs text-blue-300">${navigator.onLine ? 'Online - Sincronizado' : 'Offline - Dados locais'}</span>
+          <span class="text-xs text-blue-300">${navigator.onLine ? 'Online' : 'Offline - Dados locais'}</span>
+          ${navigator.onLine ? '<i class="fas fa-sync text-blue-300 text-xs ml-1"></i>' : ''}
         </div>
       </div>
       <div class="space-y-4">
@@ -527,6 +866,10 @@ function renderLoginPage() {
         <button class="btn-primary w-full py-3 text-lg" id="btnLogin">
           <i class="fas fa-sign-in-alt mr-2"></i> Entrar
         </button>
+        ${navigator.onLine ? `
+        <button class="w-full py-2 text-sm text-blue-300 hover:text-white transition-colors flex items-center justify-center gap-2" id="btnLoginSync">
+          <i class="fas fa-sync"></i> Sincronizar dados do servidor
+        </button>` : ''}
       </div>
       <p class="text-center text-xs text-blue-300 mt-6">&copy; 2025 Complexo Escolar Nkalambata. Todos os direitos reservados.</p>
     </div>
@@ -536,6 +879,45 @@ function renderLoginPage() {
 function bindLoginEvents() {
   document.getElementById('btnLogin')?.addEventListener('click', doLogin);
   document.getElementById('loginPass')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('loginUser')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('loginPass')?.focus(); });
+  
+  // Sync button on login page
+  document.getElementById('btnLoginSync')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnLoginSync');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Sincronizando...';
+    btn.disabled = true;
+    
+    try {
+      await DB.forceSync();
+      btn.innerHTML = '<i class="fas fa-check"></i> Sincronizado!';
+      showToast('Dados sincronizados do servidor!', 'success');
+      setTimeout(() => render(), 1000);
+    } catch (e) {
+      btn.innerHTML = '<i class="fas fa-times"></i> Erro';
+      showToast('Erro ao sincronizar!', 'error');
+      setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000);
+    }
+  });
+  
+  // Click on sync status
+  document.getElementById('loginSyncStatus')?.addEventListener('click', async () => {
+    if (!navigator.onLine) {
+      showToast('Sem conexão à internet!', 'warning');
+      return;
+    }
+    const el = document.getElementById('loginSyncStatus');
+    el.innerHTML = '<i class="fas fa-sync fa-spin text-blue-300"></i> <span class="text-xs text-blue-300">Sincronizando...</span>';
+    
+    try {
+      await DB.forceSync();
+      showToast('Dados sincronizados!', 'success');
+      render();
+    } catch (e) {
+      showToast('Erro ao sincronizar!', 'error');
+      render();
+    }
+  });
 }
 
 function doLogin() {
@@ -636,10 +1018,13 @@ function renderMainApp() {
           <h1 class="text-xl font-bold text-gray-800">${menuItems.find(m => m.id === currentPage)?.label || 'Painel'}</h1>
         </div>
         <div class="flex items-center gap-4">
-          <span class="online-indicator ${navigator.onLine ? 'online' : 'offline'}"></span>
-          <span class="text-xs text-gray-500">${navigator.onLine ? 'Online' : 'Offline'}</span>
+          <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${navigator.onLine ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500'} transition-colors" id="btnSync" title="Clique para sincronizar">
+            <span class="online-indicator ${navigator.onLine ? 'online' : 'offline'}"></span>
+            <span class="hidden sm:inline">${navigator.onLine ? 'Online' : 'Offline'}</span>
+            <i class="fas fa-sync text-xs ${navigator.onLine ? '' : 'opacity-50'}"></i>
+          </button>
           <div class="relative cursor-pointer" id="notifIcon">
-            <i class="fas fa-bell text-gray-400 text-lg"></i>
+            <i class="fas fa-bell text-gray-400 text-lg hover:text-gray-600 transition-colors"></i>
             ${unreadMsgs > 0 ? '<span class="notification-dot"></span>' : ''}
           </div>
           <div class="flex items-center gap-2 cursor-pointer" id="profileMenu">
@@ -1433,16 +1818,60 @@ function renderEventos() {
 
 // ==================== BACKUP ====================
 function renderBackup() {
-  return `<div class="card max-w-2xl">
-    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-database mr-2 text-blue-500"></i>Backup e Restauracao</h3>
+  const lastUpdate = DB.data.lastUpdate ? new Date(DB.data.lastUpdate).toLocaleString('pt-AO') : 'Nunca';
+  return `<div class="card max-w-3xl">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-database mr-2 text-blue-500"></i>Backup, Restauração e Sincronização</h3>
+    
+    <!-- Sync Status Card -->
+    <div class="mb-6 p-6 rounded-xl ${navigator.onLine ? 'bg-green-50 border-2 border-green-200' : 'bg-yellow-50 border-2 border-yellow-200'}">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 ${navigator.onLine ? 'bg-green-500' : 'bg-yellow-500'} rounded-full flex items-center justify-center">
+            <i class="fas ${navigator.onLine ? 'fa-cloud-check' : 'fa-cloud-slash'} text-2xl text-white"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-lg ${navigator.onLine ? 'text-green-800' : 'text-yellow-800'}">
+              ${navigator.onLine ? 'Conectado ao Firebase' : 'Modo Offline'}
+            </h4>
+            <p class="text-sm ${navigator.onLine ? 'text-green-600' : 'text-yellow-600'}">
+              Última actualização: ${lastUpdate}
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn-primary" onclick="forceFullSync()" ${!navigator.onLine ? 'disabled' : ''}>
+            <i class="fas fa-sync mr-2"></i>Sincronizar Agora
+          </button>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div class="bg-white/60 rounded-lg p-3">
+          <p class="text-2xl font-bold ${navigator.onLine ? 'text-green-700' : 'text-yellow-700'}">${DB.data.users?.length || 0}</p>
+          <p class="text-xs text-gray-600">Usuários</p>
+        </div>
+        <div class="bg-white/60 rounded-lg p-3">
+          <p class="text-2xl font-bold ${navigator.onLine ? 'text-green-700' : 'text-yellow-700'}">${DB.data.students?.length || 0}</p>
+          <p class="text-xs text-gray-600">Alunos</p>
+        </div>
+        <div class="bg-white/60 rounded-lg p-3">
+          <p class="text-2xl font-bold ${navigator.onLine ? 'text-green-700' : 'text-yellow-700'}">${DB.data.notas?.length || 0}</p>
+          <p class="text-xs text-gray-600">Notas</p>
+        </div>
+        <div class="bg-white/60 rounded-lg p-3">
+          <p class="text-2xl font-bold ${navigator.onLine ? 'text-green-700' : 'text-yellow-700'}">${DB.data.mensagens?.length || 0}</p>
+          <p class="text-xs text-gray-600">Mensagens</p>
+        </div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="border rounded-xl p-6 text-center">
+      <div class="border rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
         <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-download text-2xl text-green-600"></i></div>
-        <h4 class="font-bold mb-2">Fazer Backup</h4>
-        <p class="text-sm text-gray-500 mb-4">Exportar todos os dados do sistema</p>
+        <h4 class="font-bold mb-2">Fazer Backup Local</h4>
+        <p class="text-sm text-gray-500 mb-4">Exportar todos os dados para ficheiro JSON</p>
         <button class="btn-success" onclick="fazerBackup()"><i class="fas fa-download mr-2"></i>Download Backup</button>
       </div>
-      <div class="border rounded-xl p-6 text-center">
+      <div class="border rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
         <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-upload text-2xl text-orange-600"></i></div>
         <h4 class="font-bold mb-2">Restaurar Backup</h4>
         <p class="text-sm text-gray-500 mb-4">Importar dados de um backup anterior</p>
@@ -1450,13 +1879,20 @@ function renderBackup() {
         <input type="file" id="restoreFile" accept=".json" hidden onchange="restaurarBackup(event)">
       </div>
     </div>
-    <div class="mt-6 border rounded-xl p-6 text-center">
+    <div class="mt-6 border rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
       <h4 class="font-bold mb-2">Exportar Base de Dados em Excel</h4>
-      <p class="text-sm text-gray-500 mb-4">Exportar todos os dados em formato XLS</p>
+      <p class="text-sm text-gray-500 mb-4">Exportar todos os dados em formato XLS para análise</p>
       <button class="btn-info" onclick="exportarTudoXLS()"><i class="fas fa-file-excel mr-2"></i>Exportar XLS Completo</button>
     </div>
     <div class="mt-4 p-4 bg-blue-50 rounded-xl">
-      <p class="text-sm text-blue-700"><i class="fas fa-info-circle mr-2"></i>O sistema sincroniza automaticamente com o Firebase quando conectado a internet. Ultimo sync: ${new Date().toLocaleString('pt-AO')}</p>
+      <h5 class="font-semibold text-blue-800 mb-2"><i class="fas fa-info-circle mr-2"></i>Como funciona a sincronização:</h5>
+      <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside">
+        <li>Os dados são guardados localmente e sincronizados automaticamente com o Firebase</li>
+        <li>Quando offline, o sistema continua a funcionar com dados locais</li>
+        <li>Ao reconectar, os dados são sincronizados automaticamente</li>
+        <li>Alterações em tempo real são recebidas automaticamente em todos os dispositivos</li>
+        <li>Use "Sincronizar Agora" para forçar uma sincronização manual</li>
+      </ul>
     </div>
   </div>`;
 }
@@ -2137,37 +2573,106 @@ window.exportAlunosPDF = () => {
 
 // Backup
 window.fazerBackup = () => {
-  const blob = new Blob([JSON.stringify(DB.data, null, 2)], { type: 'application/json' });
+  const backupData = {
+    ...DB.data,
+    backupDate: new Date().toISOString(),
+    backupVersion: '2.0'
+  };
+  const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
   saveAs(blob, `backup_nkalambata_${new Date().toISOString().split('T')[0]}.json`);
   showToast('Backup realizado com sucesso!');
 };
-window.restaurarBackup = (event) => {
+
+window.restaurarBackup = async (event) => {
   const file = event.target.files[0];
   if (!file) return;
+  
+  if (!confirm('ATENÇÃO: Restaurar um backup irá substituir TODOS os dados actuais. Deseja continuar?')) {
+    event.target.value = '';
+    return;
+  }
+  
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
-      DB.data = JSON.parse(e.target.result);
-      DB.save();
+      const backupData = JSON.parse(e.target.result);
+      
+      // Validate backup structure
+      if (!backupData.users || !Array.isArray(backupData.users)) {
+        throw new Error('Estrutura de backup inválida');
+      }
+      
+      DB.data = backupData;
+      DB.initData();
+      DB.saveLocal();
+      
+      // Sync to Firebase immediately
+      if (navigator.onLine) {
+        DB.showSyncStatus('syncing', 'Enviando backup para o servidor...');
+        await DB.syncToFirebase(false);
+        DB.showSyncStatus('success', 'Backup restaurado e sincronizado!');
+      }
+      
       showToast('Backup restaurado com sucesso!');
       currentUser = null;
       render();
-    } catch(err) { showToast('Ficheiro invalido!', 'error'); }
+    } catch(err) { 
+      console.error('Restore error:', err);
+      showToast('Ficheiro de backup inválido!', 'error'); 
+    }
   };
   reader.readAsText(file);
+  event.target.value = '';
 };
+
+// Force full sync from backup page
+window.forceFullSync = async () => {
+  if (!navigator.onLine) {
+    showToast('Sem conexão à internet!', 'warning');
+    return;
+  }
+  
+  showToast('Iniciando sincronização completa...', 'info');
+  
+  try {
+    const result = await DB.forceSync();
+    if (result) {
+      render();
+      showToast('Sincronização completa com sucesso!', 'success');
+    }
+  } catch (e) {
+    showToast('Erro na sincronização: ' + e.message, 'error');
+  }
+};
+
 window.exportarTudoXLS = () => {
   const wb = XLSX.utils.book_new();
-  if (DB.data.users.length) {
+  if (DB.data.users?.length) {
     const ws1 = XLSX.utils.json_to_sheet(DB.data.users.map(u => ({ Nome: u.nome, Perfil: getPerfilLabel(u.perfil), BI: u.bi, Telefone: u.telefone, Email: u.email })));
     XLSX.utils.book_append_sheet(wb, ws1, 'Usuarios');
   }
-  if (DB.data.students.length) {
+  if (DB.data.students?.length) {
     const ws2 = XLSX.utils.json_to_sheet(DB.data.students.map(a => ({ Nome: a.nome, Classe: DB.data.classes.find(c=>c.id===a.classeId)?.nome, Turma: DB.data.turmas.find(t=>t.id===a.turmaId)?.nome, Genero: a.genero })));
     XLSX.utils.book_append_sheet(wb, ws2, 'Alunos');
   }
+  if (DB.data.classes?.length) {
+    const ws3 = XLSX.utils.json_to_sheet(DB.data.classes.map(c => ({ Nome: c.nome, Nivel: c.nivel })));
+    XLSX.utils.book_append_sheet(wb, ws3, 'Classes');
+  }
+  if (DB.data.turmas?.length) {
+    const ws4 = XLSX.utils.json_to_sheet(DB.data.turmas.map(t => ({ Nome: t.nome, Classe: DB.data.classes.find(c=>c.id===t.classeId)?.nome, Sala: t.sala })));
+    XLSX.utils.book_append_sheet(wb, ws4, 'Turmas');
+  }
+  if (DB.data.notas?.length) {
+    const ws5 = XLSX.utils.json_to_sheet(DB.data.notas.map(n => {
+      const aluno = DB.data.students.find(a=>a.id===n.alunoId);
+      const disc = DB.data.disciplinas.find(d=>d.id===n.disciplinaId);
+      return { Aluno: aluno?.nome, Disciplina: disc?.nome, Trimestre: n.trimestre, MAC: n.mac, PP: n.pp, PT: n.pt };
+    }));
+    XLSX.utils.book_append_sheet(wb, ws5, 'Notas');
+  }
   XLSX.writeFile(wb, 'Nkalambata_Dados_Completos.xlsx');
-  showToast('Exportacao completa realizada!');
+  showToast('Exportação completa realizada!');
 };
 
 // Relatorios
@@ -2233,6 +2738,31 @@ function bindMainEvents() {
     currentPage = 'dashboard';
     render();
     showToast('Sessao encerrada.');
+  });
+
+  // Sync button
+  document.getElementById('btnSync')?.addEventListener('click', async () => {
+    if (!navigator.onLine) {
+      showToast('Sem conexão à internet!', 'warning');
+      return;
+    }
+    const btn = document.getElementById('btnSync');
+    const icon = btn.querySelector('i');
+    icon.classList.add('fa-spin');
+    btn.disabled = true;
+    
+    try {
+      await DB.forceSync();
+      render();
+      showToast('Dados sincronizados com sucesso!', 'success');
+    } catch (e) {
+      showToast('Erro na sincronização!', 'error');
+    } finally {
+      setTimeout(() => {
+        if (icon) icon.classList.remove('fa-spin');
+        if (btn) btn.disabled = false;
+      }, 500);
+    }
   });
 
   // Notification icon
@@ -2500,20 +3030,22 @@ window.carregarHorario = () => {
   </tbody></table></div>`;
 };
 
-// ==================== NETWORK STATUS ====================
-window.addEventListener('online', () => {
-  showToast('Conectado! Sincronizando dados...', 'info');
-  DB.syncToFirebase();
-  render();
-});
-window.addEventListener('offline', () => {
-  showToast('Sem conexao. Modo offline activado.', 'warning');
-  render();
-});
-
 // ==================== INITIAL RENDER ====================
 render();
-DB.loadFromFirebase();
+
+// Force sync button handler
+window.forceSync = async () => {
+  const result = await DB.forceSync();
+  if (result) {
+    render();
+    showToast('Sincronização completa!', 'success');
+  }
+};
+
+// Add sync status to console for debugging
+console.log('🏫 Complexo Escolar Nkalambata - Sistema iniciado');
+console.log('📊 Usuários locais:', DB.data.users?.length || 0);
+console.log('🌐 Status:', navigator.onLine ? 'Online' : 'Offline');
 </script>
 </body>
 </html>
