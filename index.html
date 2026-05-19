@@ -1,12 +1,2519 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Complexo Escolar Nkalambata - Sistema de Gestão Escolar</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Complexo Escolar Nkalambata - Sistema de Gestão Escolar</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-firestore-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', sans-serif; background: #f0f2f5; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+.login-bg { background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 50%, #1a0a2e 100%); min-height: 100vh; }
+.glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+.sidebar { width: 280px; min-height: 100vh; background: linear-gradient(180deg, #1e3a5f 0%, #0d2137 100%); transition: all 0.3s; }
+.sidebar.collapsed { width: 70px; }
+.sidebar.collapsed .menu-text, .sidebar.collapsed .logo-text, .sidebar.collapsed .user-info { display: none; }
+.sidebar.collapsed .menu-item { justify-content: center; padding: 12px; }
+.sidebar.collapsed .menu-item i { margin-right: 0; }
+.menu-item { display: flex; align-items: center; padding: 12px 20px; color: #b8c7d9; cursor: pointer; transition: all 0.3s; border-radius: 8px; margin: 2px 8px; }
+.menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.15); color: #fff; }
+.menu-item i { width: 20px; margin-right: 12px; text-align: center; }
+.content { flex: 1; overflow-y: auto; max-height: 100vh; }
+.card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; }
+.stat-card { background: linear-gradient(135deg, var(--from), var(--to)); color: #fff; border-radius: 16px; padding: 24px; }
+.btn-primary { background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: #fff; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30,58,95,0.4); }
+.btn-success { background: linear-gradient(135deg, #059669, #10b981); color: #fff; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+.btn-danger { background: linear-gradient(135deg, #dc2626, #ef4444); color: #fff; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+.btn-warning { background: linear-gradient(135deg, #d97706, #f59e0b); color: #fff; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+.btn-info { background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+input, select, textarea { width: 100%; padding: 10px 14px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; transition: border-color 0.3s; outline: none; font-family: 'Inter', sans-serif; }
+input:focus, select:focus, textarea:focus { border-color: #1e3a5f; }
+table { width: 100%; border-collapse: collapse; }
+table th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; font-size: 13px; }
+table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; color: #4b5563; }
+table tr:hover { background: #f8fafc; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.modal { background: #fff; border-radius: 16px; padding: 32px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; }
+.badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.badge-success { background: #d1fae5; color: #059669; }
+.badge-danger { background: #fee2e2; color: #dc2626; }
+.badge-warning { background: #fef3c7; color: #d97706; }
+.badge-info { background: #dbeafe; color: #2563eb; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #e5e7eb; display: flex; align-items: center; justify-content: center; color: #6b7280; font-weight: 700; }
+.avatar-lg { width: 80px; height: 80px; font-size: 28px; }
+.tab-btn { padding: 10px 20px; border: none; background: none; cursor: pointer; font-weight: 500; color: #6b7280; border-bottom: 3px solid transparent; transition: all 0.3s; }
+.tab-btn.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
+.notification-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; position: absolute; top: -2px; right: -2px; }
+.online-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.online-indicator.online { background: #10b981; }
+.online-indicator.offline { background: #ef4444; }
+.photo-upload { width: 120px; height: 120px; border: 3px dashed #d1d5db; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; transition: all 0.3s; }
+.photo-upload:hover { border-color: #1e3a5f; }
+.photo-upload img { width: 100%; height: 100%; object-fit: cover; }
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@media (max-width: 768px) { .sidebar { position: fixed; z-index: 100; transform: translateX(-100%); } .sidebar.mobile-open { transform: translateX(0); } }
+.toast { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 16px 24px; border-radius: 12px; color: #fff; font-weight: 500; animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.chart-bar { transition: height 0.5s ease; }
+.dropdown { position: relative; }
+.dropdown-menu { position: absolute; top: 100%; right: 0; background: #fff; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); min-width: 200px; z-index: 50; display: none; }
+.dropdown-menu.show { display: block; }
+.search-box { position: relative; }
+.search-box input { padding-left: 40px; }
+.search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ==================== FIREBASE CONFIG ====================
+const firebaseConfig = {
+  apiKey: "AIzaSyDivpB49WezISoGxExglgJgfFit8IS9QDg",
+  authDomain: "gestao-escolar-01.firebaseapp.com",
+  projectId: "gestao-escolar-01",
+  storageBucket: "gestao-escolar-01.firebasestorage.app",
+  messagingSenderId: "622404754159",
+  appId: "1:622404754159:web:69b6eff5e97ca19522591a"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+db.enablePersistence().catch(err => console.log('Persistence error:', err));
+
+// ==================== LOCAL DB (IndexedDB + localStorage fallback) ====================
+const DB = {
+  data: {},
+  init() {
+    const saved = localStorage.getItem('nkalambata_db');
+    if (saved) this.data = JSON.parse(saved);
+    if (!this.data.users) this.data.users = [];
+    if (!this.data.students) this.data.students = [];
+    if (!this.data.classes) this.data.classes = [];
+    if (!this.data.turmas) this.data.turmas = [];
+    if (!this.data.turnos) this.data.turnos = [];
+    if (!this.data.disciplinas) this.data.disciplinas = [];
+    if (!this.data.anoLetivo) this.data.anoLetivo = null;
+    if (!this.data.trimestres) this.data.trimestres = [];
+    if (!this.data.notas) this.data.notas = [];
+    if (!this.data.mensagens) this.data.mensagens = [];
+    if (!this.data.presencas) this.data.presencas = [];
+    if (!this.data.pautas) this.data.pautas = [];
+    if (!this.data.eventos) this.data.eventos = [];
+    if (!this.data.documentos) this.data.documentos = [];
+    if (!this.data.horarios) this.data.horarios = [];
+    if (!this.data.syncQueue) this.data.syncQueue = [];
+    if (!this.data.matriculas) this.data.matriculas = [];
+    if (!this.data.encarregados) this.data.encarregados = [];
+  },
+  save() {
+    localStorage.setItem('nkalambata_db', JSON.stringify(this.data));
+    this.syncToFirebase();
+  },
+  async syncToFirebase() {
+    if (!navigator.onLine) return;
+    try {
+      const batch = db.batch();
+      const docRef = db.collection('schoolData').doc('main');
+      batch.set(docRef, { data: JSON.stringify(this.data), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      await batch.commit();
+    } catch(e) { console.log('Sync error:', e); }
+  },
+  async loadFromFirebase() {
+    if (!navigator.onLine) return;
+    try {
+      const doc = await db.collection('schoolData').doc('main').get();
+      if (doc.exists) {
+        const remoteData = JSON.parse(doc.data().data);
+        if (remoteData.users && remoteData.users.length >= this.data.users.length) {
+          this.data = remoteData;
+          this.save();
+        }
+      }
+    } catch(e) { console.log('Load from Firebase error:', e); }
+  },
+  generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
+};
+
+DB.init();
+
+// ==================== APP STATE ====================
+let currentUser = null;
+let currentPage = 'dashboard';
+let sidebarCollapsed = false;
+let editingItem = null;
+
+// ==================== UTILITY FUNCTIONS ====================
+function showToast(msg, type = 'success') {
+  const colors = { success: '#059669', error: '#dc2626', warning: '#d97706', info: '#2563eb' };
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.style.background = colors[type];
+  toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i> ${msg}`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function formatDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('pt-AO'); }
+function generatePassword() { return Math.random().toString(36).substr(2, 8); }
+
+function getInitials(name) {
+  if (!name) return '?';
+  return name.split(' ').map(n => n[0]).join('').substr(0, 2).toUpperCase();
+}
+
+function photoOrInitials(photo, name, size = '') {
+  if (photo) return `<img src="${photo}" class="avatar ${size}" alt="">`;
+  return `<div class="avatar ${size}">${getInitials(name)}</div>`;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+// ==================== EXPORT FUNCTIONS ====================
+function exportToXLS(data, filename, headers) {
+  const ws = XLSX.utils.json_to_sheet(data, { header: headers });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+  XLSX.writeFile(wb, filename + '.xlsx');
+  showToast('Ficheiro Excel exportado com sucesso!');
+}
+
+function exportToPDF(title, headers, rows) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('l', 'mm', 'a4');
+  doc.setFontSize(16);
+  doc.text('Complexo Escolar Nkalambata', 14, 15);
+  doc.setFontSize(12);
+  doc.text(title, 14, 25);
+  doc.setFontSize(8);
+  doc.text(`Data: ${new Date().toLocaleDateString('pt-AO')}`, 14, 32);
+  let y = 40;
+  const colW = (280 - 28) / headers.length;
+  doc.setFillColor(30, 58, 95);
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  headers.forEach((h, i) => {
+    doc.rect(14 + i * colW, y, colW, 8, 'F');
+    doc.text(h, 16 + i * colW, y + 5.5);
+  });
+  doc.setTextColor(0, 0, 0);
+  y += 8;
+  rows.forEach((row, ri) => {
+    if (y > 190) { doc.addPage(); y = 20; }
+    if (ri % 2 === 0) { doc.setFillColor(248, 250, 252); doc.rect(14, y, 280 - 28, 7, 'F'); }
+    row.forEach((cell, ci) => {
+      doc.text(String(cell || '-').substring(0, 30), 16 + ci * colW, y + 5);
+    });
+    y += 7;
+  });
+  doc.save(title.replace(/\s/g, '_') + '.pdf');
+  showToast('PDF exportado com sucesso!');
+}
+
+function generateDocument(type, data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(10);
+  doc.text('REPUBLICA DE ANGOLA', 105, 15, { align: 'center' });
+  doc.text('MINISTERIO DA EDUCACAO', 105, 20, { align: 'center' });
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'bold');
+  doc.text('COMPLEXO ESCOLAR NKALAMBATA', 105, 30, { align: 'center' });
+  doc.setFont(undefined, 'normal');
+  doc.line(20, 35, 190, 35);
+
+  if (type === 'declaracao') {
+    doc.setFontSize(16);
+    doc.text('DECLARACAO', 105, 50, { align: 'center' });
+    doc.setFontSize(11);
+    const text = `A Direcao do Complexo Escolar Nkalambata, declara para os devidos efeitos que ${data.nome}, portador(a) do Bilhete de Identidade n.o ${data.bi || '___________'}, e aluno(a) desta instituicao de ensino, matriculado(a) na ${data.classe || '____'} classe, turma ${data.turma || '____'}, no ano lectivo de ${DB.data.anoLetivo?.nome || '____'}.`;
+    const lines = doc.splitTextToSize(text, 160);
+    doc.text(lines, 20, 65);
+    doc.text(`Luanda, ${new Date().toLocaleDateString('pt-AO')}`, 20, 120);
+    doc.text('_________________________________', 105, 145, { align: 'center' });
+    doc.text('O(A) Director(a) Geral', 105, 152, { align: 'center' });
+  } else if (type === 'certificado') {
+    doc.setFontSize(16);
+    doc.text('CERTIFICADO', 105, 50, { align: 'center' });
+    doc.setFontSize(11);
+    const text = `Certifica-se que ${data.nome}, nascido(a) em ${data.dataNascimento || '___/___/___'}, natural de ${data.naturalidade || '___________'}, provincia de ${data.provincia || '___________'}, concluiu com aproveitamento a ${data.classe || '____'} classe do Ensino ${data.nivel || 'Primario'}, no ano lectivo de ${DB.data.anoLetivo?.nome || '____'}, com a media final de ${data.media || '____'} valores.`;
+    const lines = doc.splitTextToSize(text, 160);
+    doc.text(lines, 20, 65);
+    doc.text(`Luanda, ${new Date().toLocaleDateString('pt-AO')}`, 20, 130);
+    doc.text('_________________________________', 105, 155, { align: 'center' });
+    doc.text('O(A) Director(a) Geral', 105, 162, { align: 'center' });
+  } else if (type === 'boletim') {
+    doc.setFontSize(14);
+    doc.text('BOLETIM DE NOTAS', 105, 50, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Aluno(a): ${data.nome}`, 20, 62);
+    doc.text(`Classe: ${data.classe}  Turma: ${data.turma}`, 20, 69);
+    doc.text(`Ano Lectivo: ${DB.data.anoLetivo?.nome || '-'}`, 20, 76);
+    let y = 85;
+    doc.setFillColor(30, 58, 95);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(20, y, 60, 8, 'F');
+    doc.rect(80, y, 25, 8, 'F');
+    doc.rect(105, y, 25, 8, 'F');
+    doc.rect(130, y, 25, 8, 'F');
+    doc.rect(155, y, 25, 8, 'F');
+    doc.text('Disciplina', 22, y + 5.5);
+    doc.text('1o Trim.', 82, y + 5.5);
+    doc.text('2o Trim.', 107, y + 5.5);
+    doc.text('3o Trim.', 132, y + 5.5);
+    doc.text('Media', 157, y + 5.5);
+    doc.setTextColor(0, 0, 0);
+    y += 8;
+    if (data.notas) {
+      data.notas.forEach((n, i) => {
+        if (i % 2 === 0) { doc.setFillColor(248, 250, 252); doc.rect(20, y, 160, 7, 'F'); }
+        doc.text(n.disciplina || '-', 22, y + 5);
+        doc.text(String(n.t1 || '-'), 87, y + 5);
+        doc.text(String(n.t2 || '-'), 112, y + 5);
+        doc.text(String(n.t3 || '-'), 137, y + 5);
+        const media = n.t1 && n.t2 && n.t3 ? ((n.t1 + n.t2 + n.t3) / 3).toFixed(1) : '-';
+        doc.text(String(media), 162, y + 5);
+        y += 7;
+      });
+    }
+  }
+  doc.save(`${type}_${data.nome?.replace(/\s/g, '_') || 'doc'}.pdf`);
+  showToast('Documento gerado com sucesso!');
+}
+
+// ==================== CHECK FIRST RUN ====================
+function isFirstRun() {
+  return !DB.data.users || DB.data.users.length === 0;
+}
+
+function hasDirector() {
+  return DB.data.users.some(u => u.perfil === 'director');
+}
+
+// ==================== RENDER ENGINE ====================
+function render() {
+  const app = document.getElementById('app');
+  if (isFirstRun() && !hasDirector()) {
+    app.innerHTML = renderSetupPage();
+    bindSetupEvents();
+  } else if (!currentUser) {
+    app.innerHTML = renderLoginPage();
+    bindLoginEvents();
+  } else {
+    app.innerHTML = renderMainApp();
+    bindMainEvents();
+  }
+}
+
+// ==================== SETUP PAGE (First Director Registration) ====================
+function renderSetupPage() {
+  return `
+  <div class="login-bg flex items-center justify-center p-4">
+    <div class="glass rounded-2xl p-8 w-full max-w-2xl text-white fade-in">
+      <div class="text-center mb-6">
+        <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-school text-3xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold">Complexo Escolar Nkalambata</h1>
+        <p class="text-blue-200 mt-2">Configuracao Inicial do Sistema</p>
+        <p class="text-sm text-blue-300 mt-1">Cadastro do Director Geral</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2 flex justify-center">
+          <div class="photo-upload" id="setupPhoto" onclick="document.getElementById('setupPhotoInput').click()">
+            <i class="fas fa-camera text-2xl text-gray-400"></i>
+          </div>
+          <input type="file" id="setupPhotoInput" accept="image/*" hidden>
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Nome Completo *</label>
+          <input id="s_nome" class="!text-gray-900" placeholder="Nome completo">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Bilhete de Identidade *</label>
+          <input id="s_bi" class="!text-gray-900" placeholder="No do BI">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Data de Nascimento *</label>
+          <input id="s_dataNasc" type="date" class="!text-gray-900">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Genero *</label>
+          <select id="s_genero" class="!text-gray-900">
+            <option value="">Selecione</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Feminino">Feminino</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Estado Civil</label>
+          <select id="s_estadoCivil" class="!text-gray-900">
+            <option value="">Selecione</option>
+            <option value="Solteiro(a)">Solteiro(a)</option>
+            <option value="Casado(a)">Casado(a)</option>
+            <option value="Divorciado(a)">Divorciado(a)</option>
+            <option value="Viuvo(a)">Viuvo(a)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Naturalidade</label>
+          <input id="s_naturalidade" class="!text-gray-900" placeholder="Naturalidade">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Provincia</label>
+          <select id="s_provincia" class="!text-gray-900">
+            <option value="">Selecione</option>
+            <option>Bengo</option><option>Benguela</option><option>Bie</option>
+            <option>Cabinda</option><option>Cuando-Cubango</option><option>Cuanza Norte</option>
+            <option>Cuanza Sul</option><option>Cunene</option><option>Huambo</option>
+            <option>Huila</option><option>Icolo e Bengo</option><option>Luanda</option>
+            <option>Lunda Norte</option><option>Lunda Sul</option><option>Malanje</option>
+            <option>Moxico</option><option>Namibe</option><option>Uige</option><option>Zaire</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Municipio</label>
+          <input id="s_municipio" class="!text-gray-900" placeholder="Municipio">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Telefone *</label>
+          <input id="s_telefone" class="!text-gray-900" placeholder="+244 9XX XXX XXX">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Email</label>
+          <input id="s_email" type="email" class="!text-gray-900" placeholder="email@exemplo.com">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Habilitacoes Literarias</label>
+          <select id="s_habilitacoes" class="!text-gray-900">
+            <option value="">Selecione</option>
+            <option>Licenciatura</option><option>Mestrado</option><option>Doutoramento</option>
+            <option>Pos-Graduacao</option><option>Bacharelato</option><option>Tecnico Medio</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Area de Formacao</label>
+          <input id="s_areaFormacao" class="!text-gray-900" placeholder="Ex: Ciencias da Educacao">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">No de Agente</label>
+          <input id="s_numAgente" class="!text-gray-900" placeholder="Numero do Agente">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">IBAN</label>
+          <input id="s_iban" class="!text-gray-900" placeholder="AO06...">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Endereco / Bairro</label>
+          <input id="s_endereco" class="!text-gray-900" placeholder="Bairro, Rua...">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Nome de Usuario *</label>
+          <input id="s_username" class="!text-gray-900" placeholder="Nome de usuario para login">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Senha *</label>
+          <input id="s_password" type="password" class="!text-gray-900" placeholder="Minimo 6 caracteres">
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Confirmar Senha *</label>
+          <input id="s_password2" type="password" class="!text-gray-900" placeholder="Repita a senha">
+        </div>
+      </div>
+      <button class="btn-primary w-full mt-6 py-3 text-lg" id="btnSetup">
+        <i class="fas fa-save mr-2"></i> Registar Director Geral e Iniciar Sistema
+      </button>
+    </div>
+  </div>`;
+}
+
+function bindSetupEvents() {
+  let setupPhotoData = null;
+  document.getElementById('setupPhotoInput')?.addEventListener('change', async (e) => {
+    if (e.target.files[0]) {
+      setupPhotoData = await readFileAsDataURL(e.target.files[0]);
+      document.getElementById('setupPhoto').innerHTML = `<img src="${setupPhotoData}" alt="">`;
+    }
+  });
+  document.getElementById('btnSetup')?.addEventListener('click', () => {
+    const nome = document.getElementById('s_nome').value.trim();
+    const bi = document.getElementById('s_bi').value.trim();
+    const username = document.getElementById('s_username').value.trim();
+    const password = document.getElementById('s_password').value;
+    const password2 = document.getElementById('s_password2').value;
+    if (!nome || !bi || !username || !password) return showToast('Preencha todos os campos obrigatorios!', 'error');
+    if (password !== password2) return showToast('As senhas nao coincidem!', 'error');
+    if (password.length < 6) return showToast('A senha deve ter no minimo 6 caracteres!', 'error');
+    const user = {
+      id: DB.generateId(),
+      nome, bi,
+      dataNascimento: document.getElementById('s_dataNasc').value,
+      genero: document.getElementById('s_genero').value,
+      estadoCivil: document.getElementById('s_estadoCivil').value,
+      naturalidade: document.getElementById('s_naturalidade').value,
+      provincia: document.getElementById('s_provincia').value,
+      municipio: document.getElementById('s_municipio').value,
+      telefone: document.getElementById('s_telefone').value,
+      email: document.getElementById('s_email').value,
+      habilitacoes: document.getElementById('s_habilitacoes').value,
+      areaFormacao: document.getElementById('s_areaFormacao').value,
+      numAgente: document.getElementById('s_numAgente').value,
+      iban: document.getElementById('s_iban').value,
+      endereco: document.getElementById('s_endereco').value,
+      username, password,
+      perfil: 'director',
+      foto: setupPhotoData,
+      dataCriacao: new Date().toISOString(),
+      ativo: true
+    };
+    DB.data.users.push(user);
+    DB.save();
+    showToast('Director Geral registado com sucesso! Faca login para continuar.');
+    render();
+  });
+}
+
+// ==================== LOGIN PAGE ====================
+function renderLoginPage() {
+  return `
+  <div class="login-bg flex items-center justify-center p-4" style="min-height:100vh">
+    <div class="glass rounded-2xl p-8 w-full max-w-md text-white fade-in">
+      <div class="text-center mb-8">
+        <div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-school text-4xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold">Complexo Escolar Nkalambata</h1>
+        <p class="text-blue-200 mt-2">Sistema de Gestao Escolar</p>
+        <div class="mt-3 flex items-center justify-center gap-2">
+          <span class="online-indicator ${navigator.onLine ? 'online' : 'offline'}"></span>
+          <span class="text-xs text-blue-300">${navigator.onLine ? 'Online - Sincronizado' : 'Offline - Dados locais'}</span>
+        </div>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Nome de Usuario</label>
+          <div class="relative">
+            <i class="fas fa-user absolute left-3 top-3 text-gray-400"></i>
+            <input id="loginUser" class="!text-gray-900 !pl-10" placeholder="Digite o seu usuario">
+          </div>
+        </div>
+        <div>
+          <label class="text-sm text-blue-200 mb-1 block">Senha</label>
+          <div class="relative">
+            <i class="fas fa-lock absolute left-3 top-3 text-gray-400"></i>
+            <input id="loginPass" type="password" class="!text-gray-900 !pl-10" placeholder="Digite a sua senha">
+          </div>
+        </div>
+        <button class="btn-primary w-full py-3 text-lg" id="btnLogin">
+          <i class="fas fa-sign-in-alt mr-2"></i> Entrar
+        </button>
+      </div>
+      <p class="text-center text-xs text-blue-300 mt-6">&copy; 2025 Complexo Escolar Nkalambata. Todos os direitos reservados.</p>
+    </div>
+  </div>`;
+}
+
+function bindLoginEvents() {
+  document.getElementById('btnLogin')?.addEventListener('click', doLogin);
+  document.getElementById('loginPass')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
+}
+
+function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const user = DB.data.users.find(u => u.username === username && u.password === password && u.ativo);
+  if (!user) return showToast('Credenciais invalidas ou conta inactiva!', 'error');
+  currentUser = user;
+  currentPage = 'dashboard';
+  showToast(`Bem-vindo(a), ${user.nome}!`);
+  render();
+}
+
+// ==================== MENU ITEMS PER PROFILE ====================
+function getMenuItems() {
+  const p = currentUser.perfil;
+  const items = [
+    { id: 'dashboard', icon: 'fa-chart-pie', label: 'Painel Principal', roles: ['director','subdirector_ped','subdirector_adm','secretaria','professor','encarregado'] },
+    { id: 'ano_letivo', icon: 'fa-calendar-alt', label: 'Ano Lectivo', roles: ['director'] },
+    { id: 'trimestres', icon: 'fa-calendar-check', label: 'Trimestres', roles: ['director'] },
+    { id: 'usuarios', icon: 'fa-users-cog', label: 'Gestao de Usuarios', roles: ['director'] },
+    { id: 'professores', icon: 'fa-chalkboard-teacher', label: 'Professores', roles: ['director','subdirector_ped'] },
+    { id: 'funcionarios', icon: 'fa-id-badge', label: 'Funcionarios', roles: ['director','subdirector_adm'] },
+    { id: 'classes', icon: 'fa-layer-group', label: 'Classes', roles: ['director','subdirector_ped'] },
+    { id: 'turmas', icon: 'fa-users', label: 'Turmas', roles: ['director','subdirector_ped'] },
+    { id: 'turnos', icon: 'fa-clock', label: 'Turnos', roles: ['director','subdirector_ped'] },
+    { id: 'disciplinas', icon: 'fa-book', label: 'Disciplinas', roles: ['director','subdirector_ped'] },
+    { id: 'alunos', icon: 'fa-user-graduate', label: 'Alunos', roles: ['director','subdirector_ped','subdirector_adm','secretaria'] },
+    { id: 'matriculas', icon: 'fa-file-alt', label: 'Matriculas', roles: ['director','secretaria'] },
+    { id: 'notas', icon: 'fa-star', label: 'Lancamento de Notas', roles: ['professor','subdirector_ped'] },
+    { id: 'pautas', icon: 'fa-table', label: 'Pautas', roles: ['director','subdirector_ped','professor','secretaria'] },
+    { id: 'presencas', icon: 'fa-clipboard-check', label: 'Controle de Presenca', roles: ['professor'] },
+    { id: 'horarios', icon: 'fa-calendar-week', label: 'Horarios', roles: ['director','subdirector_ped','professor'] },
+    { id: 'documentos', icon: 'fa-file-pdf', label: 'Documentos', roles: ['secretaria','director'] },
+    { id: 'comunicacao', icon: 'fa-envelope', label: 'Comunicacao', roles: ['director','subdirector_ped','subdirector_adm','secretaria','professor','encarregado'] },
+    { id: 'financeiro', icon: 'fa-money-bill-wave', label: 'Financeiro', roles: ['director','subdirector_adm','secretaria'] },
+    { id: 'relatorios', icon: 'fa-chart-bar', label: 'Relatorios', roles: ['director','subdirector_ped','subdirector_adm'] },
+    { id: 'meus_educandos', icon: 'fa-child', label: 'Meus Educandos', roles: ['encarregado'] },
+    { id: 'eventos', icon: 'fa-bullhorn', label: 'Eventos / Avisos', roles: ['director','subdirector_ped','subdirector_adm','secretaria','professor','encarregado'] },
+    { id: 'backup', icon: 'fa-database', label: 'Backup / Restaurar', roles: ['director'] },
+    { id: 'configuracoes', icon: 'fa-cog', label: 'Configuracoes', roles: ['director'] },
+  ];
+  return items.filter(i => i.roles.includes(p));
+}
+
+function getPerfilLabel(p) {
+  const labels = { director: 'Director Geral', subdirector_ped: 'Subdirector Pedagogico', subdirector_adm: 'Subdirector Administrativo', secretaria: 'Secretaria', professor: 'Professor', encarregado: 'Encarregado de Educacao' };
+  return labels[p] || p;
+}
+
+// ==================== MAIN APP LAYOUT ====================
+function renderMainApp() {
+  const menuItems = getMenuItems();
+  const unreadMsgs = DB.data.mensagens.filter(m => m.para === currentUser.id && !m.lida).length;
+  return `
+  <div class="flex">
+    <div class="sidebar ${sidebarCollapsed ? 'collapsed' : ''}" id="sidebar">
+      <div class="p-4 border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-school text-white"></i>
+          </div>
+          <div class="logo-text">
+            <h2 class="text-white font-bold text-sm leading-tight">Complexo Escolar</h2>
+            <p class="text-blue-300 text-xs">Nkalambata</p>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-b border-white/10">
+        <div class="flex items-center gap-3">
+          ${currentUser.foto ? `<img src="${currentUser.foto}" class="avatar flex-shrink-0">` : `<div class="avatar flex-shrink-0">${getInitials(currentUser.nome)}</div>`}
+          <div class="user-info min-w-0">
+            <p class="text-white text-sm font-semibold truncate">${currentUser.nome.split(' ')[0]}</p>
+            <p class="text-blue-300 text-xs truncate">${getPerfilLabel(currentUser.perfil)}</p>
+          </div>
+        </div>
+      </div>
+      <nav class="p-2 overflow-y-auto" style="max-height:calc(100vh - 180px)">
+        ${menuItems.map(item => `
+          <div class="menu-item ${currentPage === item.id ? 'active' : ''}" data-page="${item.id}">
+            <i class="fas ${item.icon}"></i>
+            <span class="menu-text">${item.label}</span>
+            ${item.id === 'comunicacao' && unreadMsgs > 0 ? `<span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5 menu-text">${unreadMsgs}</span>` : ''}
+          </div>
+        `).join('')}
+        <div class="menu-item mt-4 text-red-300 hover:!bg-red-500/20" id="btnLogout">
+          <i class="fas fa-sign-out-alt"></i>
+          <span class="menu-text">Sair</span>
+        </div>
+      </nav>
+    </div>
+    <div class="content">
+      <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        <div class="flex items-center gap-4">
+          <button class="text-gray-500 hover:text-gray-700" id="toggleSidebar">
+            <i class="fas fa-bars text-xl"></i>
+          </button>
+          <h1 class="text-xl font-bold text-gray-800">${menuItems.find(m => m.id === currentPage)?.label || 'Painel'}</h1>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="online-indicator ${navigator.onLine ? 'online' : 'offline'}"></span>
+          <span class="text-xs text-gray-500">${navigator.onLine ? 'Online' : 'Offline'}</span>
+          <div class="relative cursor-pointer" id="notifIcon">
+            <i class="fas fa-bell text-gray-400 text-lg"></i>
+            ${unreadMsgs > 0 ? '<span class="notification-dot"></span>' : ''}
+          </div>
+          <div class="flex items-center gap-2 cursor-pointer" id="profileMenu">
+            ${currentUser.foto ? `<img src="${currentUser.foto}" class="avatar">` : `<div class="avatar">${getInitials(currentUser.nome)}</div>`}
+          </div>
+        </div>
+      </header>
+      <main class="p-6 fade-in">
+        ${renderPage()}
+      </main>
+    </div>
+  </div>`;
+}
+
+// ==================== PAGE ROUTER ====================
+function renderPage() {
+  switch(currentPage) {
+    case 'dashboard': return renderDashboard();
+    case 'ano_letivo': return renderAnoLetivo();
+    case 'trimestres': return renderTrimestres();
+    case 'usuarios': return renderUsuarios();
+    case 'professores': return renderProfessores();
+    case 'funcionarios': return renderFuncionarios();
+    case 'classes': return renderClasses();
+    case 'turmas': return renderTurmas();
+    case 'turnos': return renderTurnos();
+    case 'disciplinas': return renderDisciplinas();
+    case 'alunos': return renderAlunos();
+    case 'matriculas': return renderMatriculas();
+    case 'notas': return renderNotas();
+    case 'pautas': return renderPautas();
+    case 'presencas': return renderPresencas();
+    case 'horarios': return renderHorarios();
+    case 'documentos': return renderDocumentos();
+    case 'comunicacao': return renderComunicacao();
+    case 'financeiro': return renderFinanceiro();
+    case 'relatorios': return renderRelatorios();
+    case 'meus_educandos': return renderMeusEducandos();
+    case 'eventos': return renderEventos();
+    case 'backup': return renderBackup();
+    case 'configuracoes': return renderConfiguracoes();
+    default: return renderDashboard();
+  }
+}
+
+// ==================== DASHBOARD ====================
+function renderDashboard() {
+  const totalAlunos = DB.data.students.length;
+  const totalProfs = DB.data.users.filter(u => u.perfil === 'professor').length;
+  const totalTurmas = DB.data.turmas.length;
+  const totalClasses = DB.data.classes.length;
+  const anoAtivo = DB.data.anoLetivo?.ativo ? 'Aberto' : 'Fechado';
+  const trimestreAtivo = DB.data.trimestres.find(t => t.ativo);
+
+  const p = currentUser.perfil;
+  let extra = '';
+
+  if (p === 'professor') {
+    const minhasDisciplinas = DB.data.disciplinas.filter(d => d.professorId === currentUser.id);
+    extra = `<div class="card mt-6"><h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-book mr-2"></i>Minhas Disciplinas</h3>
+      ${minhasDisciplinas.length === 0 ? '<p class="text-gray-500">Nenhuma disciplina atribuida.</p>' :
+      `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">${minhasDisciplinas.map(d => {
+        const turma = DB.data.turmas.find(t => t.id === d.turmaId);
+        return `<div class="bg-blue-50 rounded-lg p-4"><p class="font-semibold text-blue-800">${d.nome}</p><p class="text-sm text-blue-600">${turma?.nome || ''}</p></div>`;
+      }).join('')}</div>`}</div>`;
+  }
+
+  if (p === 'encarregado') {
+    const meusFilhos = DB.data.students.filter(s => s.encarregadoId === currentUser.id);
+    extra = `<div class="card mt-6"><h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-child mr-2"></i>Meus Educandos</h3>
+      ${meusFilhos.length === 0 ? '<p class="text-gray-500">Nenhum educando registado.</p>' :
+      `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${meusFilhos.map(a => {
+        const turma = DB.data.turmas.find(t => t.id === a.turmaId);
+        const classe = DB.data.classes.find(c => c.id === a.classeId);
+        return `<div class="bg-green-50 rounded-lg p-4 flex items-center gap-4">
+          ${photoOrInitials(a.foto, a.nome)}
+          <div><p class="font-semibold text-green-800">${a.nome}</p><p class="text-sm text-green-600">${classe?.nome || ''} - ${turma?.nome || ''}</p></div>
+        </div>`;
+      }).join('')}</div>`}</div>`;
+  }
+
+  return `
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="stat-card" style="--from:#1e3a5f;--to:#2d5a8e">
+      <div class="flex justify-between items-start">
+        <div><p class="text-blue-200 text-sm">Total de Alunos</p><p class="text-3xl font-bold mt-1">${totalAlunos}</p></div>
+        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><i class="fas fa-user-graduate text-xl"></i></div>
+      </div>
+    </div>
+    <div class="stat-card" style="--from:#059669;--to:#10b981">
+      <div class="flex justify-between items-start">
+        <div><p class="text-green-200 text-sm">Professores</p><p class="text-3xl font-bold mt-1">${totalProfs}</p></div>
+        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><i class="fas fa-chalkboard-teacher text-xl"></i></div>
+      </div>
+    </div>
+    <div class="stat-card" style="--from:#7c3aed;--to:#a78bfa">
+      <div class="flex justify-between items-start">
+        <div><p class="text-purple-200 text-sm">Turmas</p><p class="text-3xl font-bold mt-1">${totalTurmas}</p></div>
+        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><i class="fas fa-users text-xl"></i></div>
+      </div>
+    </div>
+    <div class="stat-card" style="--from:#d97706;--to:#f59e0b">
+      <div class="flex justify-between items-start">
+        <div><p class="text-yellow-200 text-sm">Ano Lectivo</p><p class="text-xl font-bold mt-1">${DB.data.anoLetivo?.nome || 'N/D'}</p><p class="text-sm mt-1">${anoAtivo}</p></div>
+        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><i class="fas fa-calendar text-xl"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="card lg:col-span-2">
+      <h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-chart-bar mr-2 text-blue-500"></i>Resumo Geral</h3>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-gray-50 rounded-lg p-4 text-center">
+          <p class="text-2xl font-bold text-gray-800">${totalClasses}</p><p class="text-sm text-gray-500">Classes</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4 text-center">
+          <p class="text-2xl font-bold text-gray-800">${DB.data.turnos.length}</p><p class="text-sm text-gray-500">Turnos</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4 text-center">
+          <p class="text-2xl font-bold text-gray-800">${DB.data.disciplinas.length}</p><p class="text-sm text-gray-500">Disciplinas</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4 text-center">
+          <p class="text-2xl font-bold text-gray-800">${trimestreAtivo?.nome || 'N/D'}</p><p class="text-sm text-gray-500">Trimestre Actual</p>
+        </div>
+      </div>
+      <div class="mt-6">
+        <h4 class="font-semibold text-gray-700 mb-3">Alunos por Classe</h4>
+        <div class="flex items-end gap-2 h-40">
+          ${DB.data.classes.map(c => {
+            const count = DB.data.students.filter(s => s.classeId === c.id).length;
+            const maxCount = Math.max(...DB.data.classes.map(cl => DB.data.students.filter(s => s.classeId === cl.id).length), 1);
+            const height = (count / maxCount) * 100;
+            return `<div class="flex-1 flex flex-col items-center">
+              <span class="text-xs font-bold text-gray-600 mb-1">${count}</span>
+              <div class="w-full bg-blue-500 rounded-t chart-bar" style="height:${height}%"></div>
+              <span class="text-xs text-gray-500 mt-1">${c.nome?.replace('a Classe','')?.substring(0,4) || ''}</span>
+            </div>`;
+          }).join('')}
+          ${DB.data.classes.length === 0 ? '<p class="text-gray-400 text-sm">Sem dados</p>' : ''}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-bullhorn mr-2 text-orange-500"></i>Ultimos Eventos</h3>
+      <div class="space-y-3">
+        ${DB.data.eventos.slice(-5).reverse().map(e => `
+          <div class="bg-gray-50 rounded-lg p-3">
+            <p class="font-semibold text-sm text-gray-800">${e.titulo}</p>
+            <p class="text-xs text-gray-500 mt-1">${formatDate(e.data)}</p>
+          </div>
+        `).join('')}
+        ${DB.data.eventos.length === 0 ? '<p class="text-gray-400 text-sm">Nenhum evento registado.</p>' : ''}
+      </div>
+      <h3 class="font-bold text-gray-800 mb-4 mt-6"><i class="fas fa-envelope mr-2 text-green-500"></i>Mensagens Recentes</h3>
+      <div class="space-y-3">
+        ${DB.data.mensagens.filter(m => m.para === currentUser.id).slice(-5).reverse().map(m => {
+          const remetente = DB.data.users.find(u => u.id === m.de);
+          return `<div class="bg-gray-50 rounded-lg p-3 ${!m.lida ? 'border-l-4 border-blue-500' : ''}">
+            <p class="font-semibold text-sm text-gray-800">${m.assunto}</p>
+            <p class="text-xs text-gray-500">${remetente?.nome || 'Sistema'} - ${formatDate(m.data)}</p>
+          </div>`;
+        }).join('')}
+        ${DB.data.mensagens.filter(m => m.para === currentUser.id).length === 0 ? '<p class="text-gray-400 text-sm">Nenhuma mensagem.</p>' : ''}
+      </div>
+    </div>
+  </div>
+  ${extra}`;
+}
+
+// ==================== ANO LETIVO ====================
+function renderAnoLetivo() {
+  const ano = DB.data.anoLetivo;
+  return `<div class="card max-w-xl">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-calendar-alt mr-2 text-blue-500"></i>Gestao do Ano Lectivo</h3>
+    ${ano ? `
+      <div class="bg-blue-50 rounded-xl p-6 mb-6">
+        <div class="flex justify-between items-center">
+          <div>
+            <p class="text-2xl font-bold text-blue-800">${ano.nome}</p>
+            <p class="text-sm text-blue-600 mt-1">Inicio: ${formatDate(ano.inicio)} | Fim: ${formatDate(ano.fim)}</p>
+          </div>
+          <span class="badge ${ano.ativo ? 'badge-success' : 'badge-danger'}">${ano.ativo ? 'Aberto' : 'Fechado'}</span>
+        </div>
+        <div class="flex gap-3 mt-4">
+          ${ano.ativo ? `<button class="btn-danger" id="btnFecharAno"><i class="fas fa-lock mr-2"></i>Fechar Ano Lectivo</button>` :
+          `<button class="btn-success" id="btnReabrirAno"><i class="fas fa-lock-open mr-2"></i>Reabrir Ano</button>`}
+        </div>
+      </div>` : ''}
+    <div class="space-y-4">
+      <div><label class="text-sm font-semibold text-gray-700 mb-1 block">Nome do Ano Lectivo</label><input id="anoNome" placeholder="Ex: 2025" value="${ano?.nome || ''}"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-sm font-semibold text-gray-700 mb-1 block">Data de Inicio</label><input id="anoInicio" type="date" value="${ano?.inicio || ''}"></div>
+        <div><label class="text-sm font-semibold text-gray-700 mb-1 block">Data de Fim</label><input id="anoFim" type="date" value="${ano?.fim || ''}"></div>
+      </div>
+      <button class="btn-primary" id="btnSalvarAno"><i class="fas fa-save mr-2"></i>${ano ? 'Actualizar' : 'Abrir'} Ano Lectivo</button>
+    </div>
+  </div>`;
+}
+
+// ==================== TRIMESTRES ====================
+function renderTrimestres() {
+  return `<div class="card max-w-2xl">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-calendar-check mr-2 text-green-500"></i>Gestao de Trimestres</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      ${[1,2,3].map(n => {
+        const t = DB.data.trimestres.find(tr => tr.numero === n);
+        return `<div class="border-2 ${t?.ativo ? 'border-green-500 bg-green-50' : 'border-gray-200'} rounded-xl p-4">
+          <h4 class="font-bold text-lg ${t?.ativo ? 'text-green-700' : 'text-gray-700'}">${n}o Trimestre</h4>
+          <p class="text-sm text-gray-500 mt-1">Inicio: ${t ? formatDate(t.inicio) : '-'}</p>
+          <p class="text-sm text-gray-500">Fim: ${t ? formatDate(t.fim) : '-'}</p>
+          <span class="badge mt-2 inline-block ${t?.ativo ? 'badge-success' : t ? 'badge-danger' : 'badge-warning'}">${t?.ativo ? 'Aberto' : t ? 'Fechado' : 'Nao configurado'}</span>
+          <div class="flex gap-2 mt-3">
+            ${t?.ativo ? `<button class="btn-danger text-xs !py-1 !px-3" onclick="fecharTrimestre(${n})">Fechar</button>` :
+            `<button class="btn-success text-xs !py-1 !px-3" onclick="abrirTrimestre(${n})">Abrir</button>`}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <h4 class="font-semibold text-gray-700 mb-3">Configurar Trimestre</h4>
+    <div class="grid grid-cols-3 gap-4">
+      <div><label class="text-sm text-gray-600">Trimestre</label><select id="triNum"><option value="1">1o Trimestre</option><option value="2">2o Trimestre</option><option value="3">3o Trimestre</option></select></div>
+      <div><label class="text-sm text-gray-600">Inicio</label><input id="triInicio" type="date"></div>
+      <div><label class="text-sm text-gray-600">Fim</label><input id="triFim" type="date"></div>
+    </div>
+    <button class="btn-primary mt-4" id="btnSalvarTrimestre"><i class="fas fa-save mr-2"></i>Salvar Trimestre</button>
+  </div>`;
+}
+
+// ==================== USUARIOS ====================
+function renderUsuarios() {
+  const users = DB.data.users.filter(u => u.id !== currentUser.id);
+  return `<div class="card">
+    <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-users-cog mr-2 text-purple-500"></i>Gestao de Usuarios (${users.length + 1})</h3>
+      <div class="flex gap-3">
+        <button class="btn-primary" id="btnNovoUsuario"><i class="fas fa-plus mr-2"></i>Novo Usuario</button>
+        <button class="btn-info" onclick="exportUsuariosXLS()"><i class="fas fa-file-excel mr-2"></i>Exportar XLS</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr><th>Foto</th><th>Nome</th><th>Perfil</th><th>BI</th><th>Telefone</th><th>Estado</th><th>Acoes</th></tr></thead>
+        <tbody>
+          ${DB.data.users.map(u => `<tr>
+            <td>${photoOrInitials(u.foto, u.nome)}</td>
+            <td class="font-semibold">${u.nome}</td>
+            <td><span class="badge badge-info">${getPerfilLabel(u.perfil)}</span></td>
+            <td>${u.bi || '-'}</td>
+            <td>${u.telefone || '-'}</td>
+            <td><span class="badge ${u.ativo ? 'badge-success' : 'badge-danger'}">${u.ativo ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+              <div class="flex gap-2">
+                <button class="text-blue-500 hover:text-blue-700" onclick="editarUsuario('${u.id}')"><i class="fas fa-edit"></i></button>
+                ${u.perfil !== 'director' ? `<button class="text-red-500 hover:text-red-700" onclick="toggleUsuario('${u.id}')"><i class="fas fa-${u.ativo ? 'ban' : 'check'}"></i></button>` : ''}
+                <button class="text-green-500 hover:text-green-700" onclick="verUsuario('${u.id}')"><i class="fas fa-eye"></i></button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== CLASSES ====================
+function renderClasses() {
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-layer-group mr-2 text-indigo-500"></i>Classes (${DB.data.classes.length})</h3>
+      <button class="btn-primary" id="btnNovaClasse"><i class="fas fa-plus mr-2"></i>Nova Classe</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      ${DB.data.classes.map(c => {
+        const nAlunos = DB.data.students.filter(s => s.classeId === c.id).length;
+        const nTurmas = DB.data.turmas.filter(t => t.classeId === c.id).length;
+        return `<div class="border rounded-xl p-4 hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start">
+            <h4 class="font-bold text-gray-800">${c.nome}</h4>
+            <div class="flex gap-1">
+              <button class="text-blue-500 text-sm" onclick="editarClasse('${c.id}')"><i class="fas fa-edit"></i></button>
+              <button class="text-red-500 text-sm" onclick="eliminarClasse('${c.id}')"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500 mt-1">${c.nivel || ''}</p>
+          <div class="flex gap-4 mt-3 text-sm">
+            <span class="text-blue-600"><i class="fas fa-users mr-1"></i>${nAlunos} alunos</span>
+            <span class="text-green-600"><i class="fas fa-door-open mr-1"></i>${nTurmas} turmas</span>
+          </div>
+        </div>`;
+      }).join('')}
+      ${DB.data.classes.length === 0 ? '<p class="text-gray-400 col-span-full text-center py-8">Nenhuma classe criada.</p>' : ''}
+    </div>
+  </div>`;
+}
+
+// ==================== TURMAS ====================
+function renderTurmas() {
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-users mr-2 text-teal-500"></i>Turmas (${DB.data.turmas.length})</h3>
+      <button class="btn-primary" id="btnNovaTurma"><i class="fas fa-plus mr-2"></i>Nova Turma</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr><th>Turma</th><th>Classe</th><th>Turno</th><th>Sala</th><th>Capacidade</th><th>Alunos</th><th>Acoes</th></tr></thead>
+        <tbody>
+          ${DB.data.turmas.map(t => {
+            const classe = DB.data.classes.find(c => c.id === t.classeId);
+            const turno = DB.data.turnos.find(tn => tn.id === t.turnoId);
+            const nAlunos = DB.data.students.filter(s => s.turmaId === t.id).length;
+            return `<tr>
+              <td class="font-semibold">${t.nome}</td>
+              <td>${classe?.nome || '-'}</td>
+              <td>${turno?.nome || '-'}</td>
+              <td>${t.sala || '-'}</td>
+              <td>${t.capacidade || '-'}</td>
+              <td><span class="badge badge-info">${nAlunos}</span></td>
+              <td>
+                <button class="text-blue-500 mr-2" onclick="editarTurma('${t.id}')"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500" onclick="eliminarTurma('${t.id}')"><i class="fas fa-trash"></i></button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== TURNOS ====================
+function renderTurnos() {
+  return `<div class="card max-w-2xl">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-clock mr-2 text-orange-500"></i>Turnos (${DB.data.turnos.length})</h3>
+      <button class="btn-primary" id="btnNovoTurno"><i class="fas fa-plus mr-2"></i>Novo Turno</button>
+    </div>
+    <div class="space-y-3">
+      ${DB.data.turnos.map(t => `<div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+        <div>
+          <p class="font-semibold text-gray-800">${t.nome}</p>
+          <p class="text-sm text-gray-500">${t.horaInicio || ''} - ${t.horaFim || ''}</p>
+        </div>
+        <div class="flex gap-2">
+          <button class="text-blue-500" onclick="editarTurno('${t.id}')"><i class="fas fa-edit"></i></button>
+          <button class="text-red-500" onclick="eliminarTurno('${t.id}')"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>`).join('')}
+      ${DB.data.turnos.length === 0 ? '<p class="text-gray-400 text-center py-8">Nenhum turno criado.</p>' : ''}
+    </div>
+  </div>`;
+}
+
+// ==================== DISCIPLINAS ====================
+function renderDisciplinas() {
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-book mr-2 text-red-500"></i>Disciplinas (${DB.data.disciplinas.length})</h3>
+      <button class="btn-primary" id="btnNovaDisciplina"><i class="fas fa-plus mr-2"></i>Nova Disciplina</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr><th>Disciplina</th><th>Classe</th><th>Turma</th><th>Professor</th><th>Carga Horaria</th><th>Acoes</th></tr></thead>
+        <tbody>
+          ${DB.data.disciplinas.map(d => {
+            const prof = DB.data.users.find(u => u.id === d.professorId);
+            const classe = DB.data.classes.find(c => c.id === d.classeId);
+            const turma = DB.data.turmas.find(t => t.id === d.turmaId);
+            return `<tr>
+              <td class="font-semibold">${d.nome}</td>
+              <td>${classe?.nome || '-'}</td>
+              <td>${turma?.nome || '-'}</td>
+              <td>${prof?.nome || 'Nao atribuido'}</td>
+              <td>${d.cargaHoraria || '-'}h</td>
+              <td>
+                <button class="text-blue-500 mr-2" onclick="editarDisciplina('${d.id}')"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500" onclick="eliminarDisciplina('${d.id}')"><i class="fas fa-trash"></i></button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== PROFESSORES ====================
+function renderProfessores() {
+  const profs = DB.data.users.filter(u => u.perfil === 'professor');
+  return `<div class="card">
+    <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-chalkboard-teacher mr-2 text-green-500"></i>Professores (${profs.length})</h3>
+      <div class="flex gap-3">
+        <button class="btn-primary" onclick="openUserModal('professor')"><i class="fas fa-plus mr-2"></i>Novo Professor</button>
+        <button class="btn-info" onclick="exportProfessoresXLS()"><i class="fas fa-file-excel mr-2"></i>XLS</button>
+        <button class="btn-danger" onclick="exportProfessoresPDF()"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr><th>Foto</th><th>Nome</th><th>BI</th><th>Habilitacoes</th><th>Telefone</th><th>No Agente</th><th>Estado</th><th>Acoes</th></tr></thead>
+        <tbody>
+          ${profs.map(p => `<tr>
+            <td>${photoOrInitials(p.foto, p.nome)}</td>
+            <td class="font-semibold">${p.nome}</td>
+            <td>${p.bi || '-'}</td>
+            <td>${p.habilitacoes || '-'}</td>
+            <td>${p.telefone || '-'}</td>
+            <td>${p.numAgente || '-'}</td>
+            <td><span class="badge ${p.ativo ? 'badge-success' : 'badge-danger'}">${p.ativo ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+              <button class="text-blue-500 mr-1" onclick="editarUsuario('${p.id}')"><i class="fas fa-edit"></i></button>
+              <button class="text-green-500 mr-1" onclick="verUsuario('${p.id}')"><i class="fas fa-eye"></i></button>
+              <button class="text-red-500" onclick="toggleUsuario('${p.id}')"><i class="fas fa-${p.ativo ? 'ban' : 'check'}"></i></button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== FUNCIONARIOS ====================
+function renderFuncionarios() {
+  const funcs = DB.data.users.filter(u => !['professor','encarregado'].includes(u.perfil));
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-id-badge mr-2 text-yellow-500"></i>Funcionarios (${funcs.length})</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr><th>Foto</th><th>Nome</th><th>Perfil</th><th>BI</th><th>Telefone</th><th>Acoes</th></tr></thead>
+        <tbody>
+          ${funcs.map(f => `<tr>
+            <td>${photoOrInitials(f.foto, f.nome)}</td>
+            <td class="font-semibold">${f.nome}</td>
+            <td><span class="badge badge-info">${getPerfilLabel(f.perfil)}</span></td>
+            <td>${f.bi || '-'}</td>
+            <td>${f.telefone || '-'}</td>
+            <td><button class="text-green-500" onclick="verUsuario('${f.id}')"><i class="fas fa-eye"></i></button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== ALUNOS ====================
+function renderAlunos() {
+  const alunos = DB.data.students;
+  return `<div class="card">
+    <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-user-graduate mr-2 text-blue-500"></i>Alunos (${alunos.length})</h3>
+      <div class="flex gap-3 flex-wrap">
+        <div class="search-box"><i class="fas fa-search"></i><input id="searchAluno" placeholder="Pesquisar aluno..." onkeyup="filterAlunos()"></div>
+        <button class="btn-primary" id="btnNovoAluno"><i class="fas fa-plus mr-2"></i>Novo Aluno</button>
+        <button class="btn-info" onclick="exportAlunosXLS()"><i class="fas fa-file-excel mr-2"></i>XLS</button>
+        <button class="btn-danger" onclick="exportAlunosPDF()"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+      </div>
+    </div>
+    <div class="flex gap-3 mb-4 flex-wrap">
+      <select id="filterClasse" onchange="filterAlunos()" class="!w-auto"><option value="">Todas as Classes</option>${DB.data.classes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('')}</select>
+      <select id="filterTurma" onchange="filterAlunos()" class="!w-auto"><option value="">Todas as Turmas</option>${DB.data.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}</select>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="tabelaAlunos">
+        <thead><tr><th>Foto</th><th>No</th><th>Nome</th><th>Classe</th><th>Turma</th><th>Genero</th><th>Data Nasc.</th><th>Encarregado</th><th>Acoes</th></tr></thead>
+        <tbody>
+          ${alunos.map((a, i) => {
+            const classe = DB.data.classes.find(c => c.id === a.classeId);
+            const turma = DB.data.turmas.find(t => t.id === a.turmaId);
+            const enc = DB.data.users.find(u => u.id === a.encarregadoId);
+            return `<tr data-classe="${a.classeId}" data-turma="${a.turmaId}" data-nome="${a.nome?.toLowerCase()}">
+              <td>${photoOrInitials(a.foto, a.nome)}</td>
+              <td>${a.numero || (i+1)}</td>
+              <td class="font-semibold">${a.nome}</td>
+              <td>${classe?.nome || '-'}</td>
+              <td>${turma?.nome || '-'}</td>
+              <td>${a.genero || '-'}</td>
+              <td>${formatDate(a.dataNascimento)}</td>
+              <td>${enc?.nome || '-'}</td>
+              <td>
+                <button class="text-blue-500 mr-1" onclick="editarAluno('${a.id}')"><i class="fas fa-edit"></i></button>
+                <button class="text-green-500 mr-1" onclick="verAluno('${a.id}')"><i class="fas fa-eye"></i></button>
+                <button class="text-red-500" onclick="eliminarAluno('${a.id}')"><i class="fas fa-trash"></i></button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== MATRICULAS ====================
+function renderMatriculas() {
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-file-alt mr-2 text-teal-500"></i>Matriculas</h3>
+      <button class="btn-primary" id="btnNovoAluno"><i class="fas fa-plus mr-2"></i>Nova Matricula</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr><th>No</th><th>Aluno</th><th>Classe</th><th>Turma</th><th>Data</th><th>Ano Lectivo</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${DB.data.students.map((a,i) => {
+            const classe = DB.data.classes.find(c => c.id === a.classeId);
+            const turma = DB.data.turmas.find(t => t.id === a.turmaId);
+            return `<tr>
+              <td>${i+1}</td>
+              <td class="font-semibold">${a.nome}</td>
+              <td>${classe?.nome || '-'}</td>
+              <td>${turma?.nome || '-'}</td>
+              <td>${formatDate(a.dataMatricula)}</td>
+              <td>${DB.data.anoLetivo?.nome || '-'}</td>
+              <td><span class="badge badge-success">Activa</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== NOTAS ====================
+function renderNotas() {
+  const p = currentUser.perfil;
+  let disciplinasDisponiveis = DB.data.disciplinas;
+  if (p === 'professor') {
+    disciplinasDisponiveis = DB.data.disciplinas.filter(d => d.professorId === currentUser.id);
+  }
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-star mr-2 text-yellow-500"></i>Lancamento de Notas</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div><label class="text-sm font-semibold text-gray-700">Disciplina</label>
+        <select id="notaDisciplina" onchange="carregarAlunosNota()">
+          <option value="">Selecione</option>
+          ${disciplinasDisponiveis.map(d => `<option value="${d.id}">${d.nome} (${DB.data.turmas.find(t => t.id === d.turmaId)?.nome || ''})</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="text-sm font-semibold text-gray-700">Trimestre</label>
+        <select id="notaTrimestre">
+          ${DB.data.trimestres.filter(t => t.ativo || true).map(t => `<option value="${t.numero}" ${t.ativo ? 'selected' : ''}>${t.numero}o Trimestre</option>`).join('')}
+          ${DB.data.trimestres.length === 0 ? '<option value="1">1o Trimestre</option><option value="2">2o Trimestre</option><option value="3">3o Trimestre</option>' : ''}
+        </select>
+      </div>
+      <div class="flex items-end"><button class="btn-primary w-full" onclick="carregarAlunosNota()"><i class="fas fa-search mr-2"></i>Carregar</button></div>
+    </div>
+    <div id="notasContainer"></div>
+  </div>`;
+}
+
+// ==================== PAUTAS ====================
+function renderPautas() {
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-table mr-2 text-indigo-500"></i>Pautas</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div><label class="text-sm font-semibold">Classe</label>
+        <select id="pautaClasse" onchange="carregarPauta()">
+          <option value="">Selecione</option>
+          ${DB.data.classes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="text-sm font-semibold">Turma</label>
+        <select id="pautaTurma" onchange="carregarPauta()">
+          <option value="">Todas</option>
+          ${DB.data.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div class="flex items-end gap-2">
+        <button class="btn-primary" onclick="carregarPauta()"><i class="fas fa-search mr-2"></i>Ver Pauta</button>
+        <button class="btn-danger" onclick="exportarPautaPDF()"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+      </div>
+    </div>
+    <div id="pautaContainer"></div>
+  </div>`;
+}
+
+// ==================== PRESENCAS ====================
+function renderPresencas() {
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-clipboard-check mr-2 text-green-500"></i>Controle de Presenca</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div><label class="text-sm font-semibold">Disciplina</label>
+        <select id="presencaDisciplina">
+          <option value="">Selecione</option>
+          ${DB.data.disciplinas.filter(d => d.professorId === currentUser.id || currentUser.perfil === 'director').map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="text-sm font-semibold">Data</label><input id="presencaData" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+      <div class="flex items-end"><button class="btn-primary" onclick="carregarPresencas()"><i class="fas fa-search mr-2"></i>Carregar</button></div>
+    </div>
+    <div id="presencaContainer"></div>
+  </div>`;
+}
+
+// ==================== HORARIOS ====================
+function renderHorarios() {
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-calendar-week mr-2 text-purple-500"></i>Horarios</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div><label class="text-sm font-semibold">Turma</label>
+        <select id="horarioTurma" onchange="carregarHorario()">
+          <option value="">Selecione</option>
+          ${DB.data.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div class="flex items-end gap-2">
+        <button class="btn-primary" id="btnAddHorario"><i class="fas fa-plus mr-2"></i>Adicionar Aula</button>
+      </div>
+    </div>
+    <div id="horarioContainer">
+      <div class="grid grid-cols-6 gap-1 text-center text-sm">
+        <div class="font-bold bg-gray-100 p-2 rounded">Hora</div>
+        ${['Segunda','Terca','Quarta','Quinta','Sexta'].map(d => `<div class="font-bold bg-gray-100 p-2 rounded">${d}</div>`).join('')}
+      </div>
+      <p class="text-gray-400 text-center mt-8">Selecione uma turma para ver o horario.</p>
+    </div>
+  </div>`;
+}
+
+// ==================== DOCUMENTOS (Secretaria) ====================
+function renderDocumentos() {
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-file-pdf mr-2 text-red-500"></i>Emissao de Documentos</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="border rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onclick="emitirDocumento('declaracao')">
+        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-file-alt text-2xl text-blue-600"></i></div>
+        <h4 class="font-bold text-gray-800">Declaracao</h4>
+        <p class="text-sm text-gray-500 mt-2">Declaracao de matricula ou frequencia</p>
+      </div>
+      <div class="border rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onclick="emitirDocumento('boletim')">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-table text-2xl text-green-600"></i></div>
+        <h4 class="font-bold text-gray-800">Boletim de Notas</h4>
+        <p class="text-sm text-gray-500 mt-2">Boletim individual do aluno</p>
+      </div>
+      <div class="border rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onclick="emitirDocumento('certificado')">
+        <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-award text-2xl text-purple-600"></i></div>
+        <h4 class="font-bold text-gray-800">Certificado</h4>
+        <p class="text-sm text-gray-500 mt-2">Certificado de conclusao</p>
+      </div>
+    </div>
+    <div id="docFormContainer" class="mt-6"></div>
+  </div>`;
+}
+
+// ==================== COMUNICACAO ====================
+function renderComunicacao() {
+  const minhasMsgs = DB.data.mensagens.filter(m => m.para === currentUser.id || m.de === currentUser.id || m.paraTodos || (m.paraPerfil && m.paraPerfil === currentUser.perfil));
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-envelope mr-2 text-green-500"></i>Comunicacao</h3>
+      <button class="btn-primary" id="btnNovaMensagem"><i class="fas fa-paper-plane mr-2"></i>Nova Mensagem</button>
+    </div>
+    <div class="flex gap-4 mb-4">
+      <button class="tab-btn active" onclick="this.parentElement.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('inbox').style.display='block';document.getElementById('sent').style.display='none'">Recebidas</button>
+      <button class="tab-btn" onclick="this.parentElement.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('inbox').style.display='none';document.getElementById('sent').style.display='block'">Enviadas</button>
+    </div>
+    <div id="inbox">
+      ${minhasMsgs.filter(m => m.para === currentUser.id || m.paraTodos || (m.paraPerfil === currentUser.perfil)).map(m => {
+        const remetente = DB.data.users.find(u => u.id === m.de);
+        return `<div class="border-b py-3 px-2 flex items-start gap-3 cursor-pointer hover:bg-gray-50 ${!m.lida ? 'bg-blue-50' : ''}" onclick="lerMensagem('${m.id}')">
+          ${photoOrInitials(remetente?.foto, remetente?.nome || 'Sistema')}
+          <div class="min-w-0 flex-1">
+            <div class="flex justify-between"><p class="font-semibold text-sm text-gray-800">${remetente?.nome || 'Sistema'}</p><p class="text-xs text-gray-400">${formatDate(m.data)}</p></div>
+            <p class="font-medium text-sm text-gray-700">${m.assunto}</p>
+            <p class="text-xs text-gray-500 truncate">${m.corpo?.substring(0, 80)}...</p>
+          </div>
+        </div>`;
+      }).join('')}
+      ${minhasMsgs.filter(m => m.para === currentUser.id || m.paraTodos || (m.paraPerfil === currentUser.perfil)).length === 0 ? '<p class="text-gray-400 text-center py-8">Nenhuma mensagem recebida.</p>' : ''}
+    </div>
+    <div id="sent" style="display:none">
+      ${DB.data.mensagens.filter(m => m.de === currentUser.id).map(m => {
+        const dest = DB.data.users.find(u => u.id === m.para);
+        return `<div class="border-b py-3 px-2 flex items-start gap-3">
+          ${photoOrInitials(dest?.foto, dest?.nome || (m.paraTodos ? 'Todos' : m.paraPerfil ? getPerfilLabel(m.paraPerfil) : '?'))}
+          <div class="min-w-0 flex-1">
+            <div class="flex justify-between"><p class="font-semibold text-sm text-gray-800">Para: ${dest?.nome || (m.paraTodos ? 'Todos' : m.paraPerfil ? getPerfilLabel(m.paraPerfil) : '?')}</p><p class="text-xs text-gray-400">${formatDate(m.data)}</p></div>
+            <p class="font-medium text-sm text-gray-700">${m.assunto}</p>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// ==================== FINANCEIRO ====================
+function renderFinanceiro() {
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-money-bill-wave mr-2 text-green-500"></i>Gestao Financeira</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="stat-card" style="--from:#059669;--to:#10b981">
+        <p class="text-green-200 text-sm">Propinas Recebidas</p>
+        <p class="text-2xl font-bold mt-1">${(DB.data.financeiro?.receitas || 0).toLocaleString()} Kz</p>
+      </div>
+      <div class="stat-card" style="--from:#dc2626;--to:#ef4444">
+        <p class="text-red-200 text-sm">Despesas</p>
+        <p class="text-2xl font-bold mt-1">${(DB.data.financeiro?.despesas || 0).toLocaleString()} Kz</p>
+      </div>
+      <div class="stat-card" style="--from:#2563eb;--to:#60a5fa">
+        <p class="text-blue-200 text-sm">Saldo</p>
+        <p class="text-2xl font-bold mt-1">${((DB.data.financeiro?.receitas || 0) - (DB.data.financeiro?.despesas || 0)).toLocaleString()} Kz</p>
+      </div>
+    </div>
+    <p class="text-gray-500 text-sm text-center">Modulo financeiro simplificado. Funcionalidades completas em desenvolvimento.</p>
+  </div>`;
+}
+
+// ==================== RELATORIOS ====================
+function renderRelatorios() {
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-chart-bar mr-2 text-indigo-500"></i>Relatorios</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="border rounded-xl p-6 cursor-pointer hover:shadow-lg transition" onclick="gerarRelatorio('alunos_classe')">
+        <i class="fas fa-user-graduate text-2xl text-blue-500 mb-3"></i>
+        <h4 class="font-bold">Alunos por Classe</h4>
+        <p class="text-sm text-gray-500">Lista completa de alunos por classe</p>
+      </div>
+      <div class="border rounded-xl p-6 cursor-pointer hover:shadow-lg transition" onclick="gerarRelatorio('professores')">
+        <i class="fas fa-chalkboard-teacher text-2xl text-green-500 mb-3"></i>
+        <h4 class="font-bold">Lista de Professores</h4>
+        <p class="text-sm text-gray-500">Todos os professores e suas disciplinas</p>
+      </div>
+      <div class="border rounded-xl p-6 cursor-pointer hover:shadow-lg transition" onclick="gerarRelatorio('estatisticas')">
+        <i class="fas fa-chart-pie text-2xl text-purple-500 mb-3"></i>
+        <h4 class="font-bold">Estatisticas Gerais</h4>
+        <p class="text-sm text-gray-500">Numeros gerais da escola</p>
+      </div>
+      <div class="border rounded-xl p-6 cursor-pointer hover:shadow-lg transition" onclick="gerarRelatorio('aproveitamento')">
+        <i class="fas fa-award text-2xl text-yellow-500 mb-3"></i>
+        <h4 class="font-bold">Aproveitamento</h4>
+        <p class="text-sm text-gray-500">Taxa de aprovacao por classe</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ==================== MEUS EDUCANDOS ====================
+function renderMeusEducandos() {
+  const meusFilhos = DB.data.students.filter(s => s.encarregadoId === currentUser.id);
+  return `<div class="card">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-child mr-2 text-pink-500"></i>Meus Educandos</h3>
+    ${meusFilhos.length === 0 ? '<p class="text-gray-500">Nenhum educando associado a sua conta.</p>' :
+    meusFilhos.map(a => {
+      const classe = DB.data.classes.find(c => c.id === a.classeId);
+      const turma = DB.data.turmas.find(t => t.id === a.turmaId);
+      const notasAluno = DB.data.notas.filter(n => n.alunoId === a.id);
+      return `<div class="border rounded-xl p-6 mb-4">
+        <div class="flex items-center gap-4 mb-4">
+          ${photoOrInitials(a.foto, a.nome, 'avatar-lg')}
+          <div>
+            <h4 class="text-xl font-bold text-gray-800">${a.nome}</h4>
+            <p class="text-gray-500">${classe?.nome || '-'} - ${turma?.nome || '-'}</p>
+          </div>
+        </div>
+        <h5 class="font-semibold mb-2">Notas</h5>
+        <table><thead><tr><th>Disciplina</th><th>1o T</th><th>2o T</th><th>3o T</th><th>Media</th></tr></thead><tbody>
+          ${notasAluno.length > 0 ? notasAluno.map(n => {
+            const disc = DB.data.disciplinas.find(d => d.id === n.disciplinaId);
+            const media = n.nota1 && n.nota2 && n.nota3 ? ((n.nota1 + n.nota2 + n.nota3) / 3).toFixed(1) : '-';
+            return `<tr><td>${disc?.nome || '-'}</td><td>${n.nota1 || '-'}</td><td>${n.nota2 || '-'}</td><td>${n.nota3 || '-'}</td><td class="font-bold">${media}</td></tr>`;
+          }).join('') : '<tr><td colspan="5" class="text-center text-gray-400">Sem notas lancadas</td></tr>'}
+        </tbody></table>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ==================== EVENTOS ====================
+function renderEventos() {
+  return `<div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-bullhorn mr-2 text-orange-500"></i>Eventos e Avisos</h3>
+      ${['director','subdirector_ped','subdirector_adm'].includes(currentUser.perfil) ? `<button class="btn-primary" id="btnNovoEvento"><i class="fas fa-plus mr-2"></i>Novo Evento</button>` : ''}
+    </div>
+    <div class="space-y-4">
+      ${DB.data.eventos.slice().reverse().map(e => `<div class="border rounded-xl p-4">
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="badge ${e.tipo === 'urgente' ? 'badge-danger' : e.tipo === 'aviso' ? 'badge-warning' : 'badge-info'}">${e.tipo || 'info'}</span>
+            <h4 class="font-bold text-gray-800 mt-2">${e.titulo}</h4>
+            <p class="text-sm text-gray-600 mt-1">${e.descricao}</p>
+            <p class="text-xs text-gray-400 mt-2"><i class="fas fa-calendar mr-1"></i>${formatDate(e.data)}</p>
+          </div>
+        </div>
+      </div>`).join('')}
+      ${DB.data.eventos.length === 0 ? '<p class="text-gray-400 text-center py-8">Nenhum evento registado.</p>' : ''}
+    </div>
+  </div>`;
+}
+
+// ==================== BACKUP ====================
+function renderBackup() {
+  return `<div class="card max-w-2xl">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-database mr-2 text-blue-500"></i>Backup e Restauracao</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="border rounded-xl p-6 text-center">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-download text-2xl text-green-600"></i></div>
+        <h4 class="font-bold mb-2">Fazer Backup</h4>
+        <p class="text-sm text-gray-500 mb-4">Exportar todos os dados do sistema</p>
+        <button class="btn-success" onclick="fazerBackup()"><i class="fas fa-download mr-2"></i>Download Backup</button>
+      </div>
+      <div class="border rounded-xl p-6 text-center">
+        <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-upload text-2xl text-orange-600"></i></div>
+        <h4 class="font-bold mb-2">Restaurar Backup</h4>
+        <p class="text-sm text-gray-500 mb-4">Importar dados de um backup anterior</p>
+        <button class="btn-warning" onclick="document.getElementById('restoreFile').click()"><i class="fas fa-upload mr-2"></i>Restaurar</button>
+        <input type="file" id="restoreFile" accept=".json" hidden onchange="restaurarBackup(event)">
+      </div>
+    </div>
+    <div class="mt-6 border rounded-xl p-6 text-center">
+      <h4 class="font-bold mb-2">Exportar Base de Dados em Excel</h4>
+      <p class="text-sm text-gray-500 mb-4">Exportar todos os dados em formato XLS</p>
+      <button class="btn-info" onclick="exportarTudoXLS()"><i class="fas fa-file-excel mr-2"></i>Exportar XLS Completo</button>
+    </div>
+    <div class="mt-4 p-4 bg-blue-50 rounded-xl">
+      <p class="text-sm text-blue-700"><i class="fas fa-info-circle mr-2"></i>O sistema sincroniza automaticamente com o Firebase quando conectado a internet. Ultimo sync: ${new Date().toLocaleString('pt-AO')}</p>
+    </div>
+  </div>`;
+}
+
+// ==================== CONFIGURACOES ====================
+function renderConfiguracoes() {
+  return `<div class="card max-w-2xl">
+    <h3 class="font-bold text-gray-800 mb-6"><i class="fas fa-cog mr-2 text-gray-500"></i>Configuracoes do Sistema</h3>
+    <div class="space-y-6">
+      <div class="border rounded-xl p-6">
+        <h4 class="font-bold mb-4">Dados da Escola</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="text-sm font-semibold text-gray-700">Nome</label><input value="Complexo Escolar Nkalambata" disabled></div>
+          <div><label class="text-sm font-semibold text-gray-700">Telefone</label><input id="cfgTelefone" value="${DB.data.config?.telefone || ''}"></div>
+          <div><label class="text-sm font-semibold text-gray-700">Email</label><input id="cfgEmail" value="${DB.data.config?.email || ''}"></div>
+          <div><label class="text-sm font-semibold text-gray-700">Endereco</label><input id="cfgEndereco" value="${DB.data.config?.endereco || ''}"></div>
+        </div>
+        <button class="btn-primary mt-4" id="btnSalvarConfig"><i class="fas fa-save mr-2"></i>Salvar Configuracoes</button>
+      </div>
+      <div class="border rounded-xl p-6">
+        <h4 class="font-bold mb-4">Meu Perfil</h4>
+        <div class="flex items-center gap-4 mb-4">
+          ${photoOrInitials(currentUser.foto, currentUser.nome, 'avatar-lg')}
+          <div>
+            <p class="font-bold text-lg">${currentUser.nome}</p>
+            <p class="text-gray-500">${getPerfilLabel(currentUser.perfil)}</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="text-sm font-semibold">Nova Senha</label><input id="novaSenha" type="password" placeholder="Nova senha"></div>
+          <div><label class="text-sm font-semibold">Confirmar</label><input id="confSenha" type="password" placeholder="Confirmar"></div>
+        </div>
+        <button class="btn-warning mt-4" id="btnAlterarSenha"><i class="fas fa-key mr-2"></i>Alterar Senha</button>
+      </div>
+      <div class="border rounded-xl p-6 border-red-200 bg-red-50">
+        <h4 class="font-bold text-red-700 mb-2">Zona de Perigo</h4>
+        <p class="text-sm text-red-600 mb-4">Apagar todos os dados do sistema. Esta accao e irreversivel!</p>
+        <button class="btn-danger" onclick="if(confirm('TEM CERTEZA? Todos os dados serao apagados permanentemente!')){localStorage.removeItem('nkalambata_db');location.reload();}"><i class="fas fa-skull-crossbones mr-2"></i>Apagar Tudo</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ==================== MODAL SYSTEM ====================
+function showModal(title, content, size = '800px') {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'modalOverlay';
+  overlay.innerHTML = `<div class="modal fade-in" style="max-width:${size}">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-lg font-bold text-gray-800">${title}</h3>
+      <button class="text-gray-400 hover:text-gray-600 text-2xl" onclick="closeModal()">&times;</button>
+    </div>
+    <div>${content}</div>
+  </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  document.body.appendChild(overlay);
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay')?.remove();
+}
+
+// ==================== USER MODAL (Create/Edit) ====================
+function openUserModal(perfil, userId = null) {
+  const user = userId ? DB.data.users.find(u => u.id === userId) : null;
+  editingItem = userId;
+  const provincias = ['Bengo','Benguela','Bie','Cabinda','Cuando-Cubango','Cuanza Norte','Cuanza Sul','Cunene','Huambo','Huila','Luanda','Lunda Norte','Lunda Sul','Malanje','Moxico','Namibe','Uige','Zaire'];
+  showModal(user ? `Editar ${getPerfilLabel(perfil)}` : `Novo ${getPerfilLabel(perfil)}`, `
+    <div class="flex justify-center mb-4">
+      <div class="photo-upload" id="modalPhoto" onclick="document.getElementById('modalPhotoInput').click()">
+        ${user?.foto ? `<img src="${user.foto}">` : '<i class="fas fa-camera text-2xl text-gray-400"></i>'}
+      </div>
+      <input type="file" id="modalPhotoInput" accept="image/*" hidden>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div><label class="text-sm font-semibold text-gray-700">Nome Completo *</label><input id="m_nome" value="${user?.nome || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">BI *</label><input id="m_bi" value="${user?.bi || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Data de Nascimento</label><input id="m_dataNasc" type="date" value="${user?.dataNascimento || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Genero</label><select id="m_genero"><option value="">Selecione</option><option ${user?.genero === 'Masculino' ? 'selected' : ''}>Masculino</option><option ${user?.genero === 'Feminino' ? 'selected' : ''}>Feminino</option></select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Estado Civil</label><select id="m_estadoCivil"><option value="">Selecione</option><option ${user?.estadoCivil === 'Solteiro(a)' ? 'selected' : ''}>Solteiro(a)</option><option ${user?.estadoCivil === 'Casado(a)' ? 'selected' : ''}>Casado(a)</option><option ${user?.estadoCivil === 'Divorciado(a)' ? 'selected' : ''}>Divorciado(a)</option><option ${user?.estadoCivil === 'Viuvo(a)' ? 'selected' : ''}>Viuvo(a)</option></select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Naturalidade</label><input id="m_naturalidade" value="${user?.naturalidade || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Provincia</label><select id="m_provincia"><option value="">Selecione</option>${provincias.map(p => `<option ${user?.provincia === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Municipio</label><input id="m_municipio" value="${user?.municipio || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Telefone *</label><input id="m_telefone" value="${user?.telefone || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Email</label><input id="m_email" type="email" value="${user?.email || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Habilitacoes</label><select id="m_habilitacoes"><option value="">Selecione</option><option ${user?.habilitacoes === 'Licenciatura' ? 'selected' : ''}>Licenciatura</option><option ${user?.habilitacoes === 'Mestrado' ? 'selected' : ''}>Mestrado</option><option ${user?.habilitacoes === 'Doutoramento' ? 'selected' : ''}>Doutoramento</option><option ${user?.habilitacoes === 'Pos-Graduacao' ? 'selected' : ''}>Pos-Graduacao</option><option ${user?.habilitacoes === 'Bacharelato' ? 'selected' : ''}>Bacharelato</option><option ${user?.habilitacoes === 'Tecnico Medio' ? 'selected' : ''}>Tecnico Medio</option><option ${user?.habilitacoes === 'Ensino Medio' ? 'selected' : ''}>Ensino Medio</option></select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Area de Formacao</label><input id="m_areaFormacao" value="${user?.areaFormacao || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">No de Agente</label><input id="m_numAgente" value="${user?.numAgente || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">IBAN</label><input id="m_iban" value="${user?.iban || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Endereco</label><input id="m_endereco" value="${user?.endereco || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Perfil *</label><select id="m_perfil"><option value="director" ${perfil === 'director' ? 'selected' : ''}>Director Geral</option><option value="subdirector_ped" ${perfil === 'subdirector_ped' ? 'selected' : ''}>Subdirector Pedagogico</option><option value="subdirector_adm" ${perfil === 'subdirector_adm' ? 'selected' : ''}>Subdirector Administrativo</option><option value="secretaria" ${perfil === 'secretaria' ? 'selected' : ''}>Secretaria</option><option value="professor" ${perfil === 'professor' ? 'selected' : ''}>Professor</option><option value="encarregado" ${perfil === 'encarregado' ? 'selected' : ''}>Encarregado de Educacao</option></select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Username *</label><input id="m_username" value="${user?.username || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">${user ? 'Nova Senha (deixe vazio para manter)' : 'Senha *'}</label><input id="m_password" type="password" value=""></div>
+    </div>
+    <div class="flex justify-end gap-3 mt-6">
+      <button class="btn-danger" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" id="btnSalvarUsuarioModal"><i class="fas fa-save mr-2"></i>${user ? 'Actualizar' : 'Cadastrar'}</button>
+    </div>
+  `);
+
+  let modalPhotoData = user?.foto || null;
+  document.getElementById('modalPhotoInput')?.addEventListener('change', async (e) => {
+    if (e.target.files[0]) {
+      modalPhotoData = await readFileAsDataURL(e.target.files[0]);
+      document.getElementById('modalPhoto').innerHTML = `<img src="${modalPhotoData}">`;
+    }
+  });
+
+  document.getElementById('btnSalvarUsuarioModal')?.addEventListener('click', () => {
+    const nome = document.getElementById('m_nome').value.trim();
+    const bi = document.getElementById('m_bi').value.trim();
+    const username = document.getElementById('m_username').value.trim();
+    const password = document.getElementById('m_password').value;
+    if (!nome || !bi || !username) return showToast('Preencha os campos obrigatorios!', 'error');
+    if (!user && !password) return showToast('Defina uma senha!', 'error');
+
+    const userData = {
+      nome, bi,
+      dataNascimento: document.getElementById('m_dataNasc').value,
+      genero: document.getElementById('m_genero').value,
+      estadoCivil: document.getElementById('m_estadoCivil').value,
+      naturalidade: document.getElementById('m_naturalidade').value,
+      provincia: document.getElementById('m_provincia').value,
+      municipio: document.getElementById('m_municipio').value,
+      telefone: document.getElementById('m_telefone').value,
+      email: document.getElementById('m_email').value,
+      habilitacoes: document.getElementById('m_habilitacoes').value,
+      areaFormacao: document.getElementById('m_areaFormacao').value,
+      numAgente: document.getElementById('m_numAgente').value,
+      iban: document.getElementById('m_iban').value,
+      endereco: document.getElementById('m_endereco').value,
+      perfil: document.getElementById('m_perfil').value,
+      username,
+      foto: modalPhotoData,
+      ativo: true
+    };
+    if (password) userData.password = password;
+
+    if (user) {
+      Object.assign(user, userData);
+      if (!password) user.password = user.password; // keep old
+      showToast('Usuario actualizado com sucesso!');
+    } else {
+      userData.id = DB.generateId();
+      userData.dataCriacao = new Date().toISOString();
+      if (!userData.password) userData.password = password;
+      DB.data.users.push(userData);
+      showToast('Usuario cadastrado com sucesso!');
+    }
+    DB.save();
+    closeModal();
+    render();
+  });
+}
+
+// ==================== STUDENT MODAL ====================
+function openStudentModal(studentId = null) {
+  const student = studentId ? DB.data.students.find(s => s.id === studentId) : null;
+  const provincias = ['Bengo','Benguela','Bie','Cabinda','Cuando-Cubango','Cuanza Norte','Cuanza Sul','Cunene','Huambo','Huila','Luanda','Lunda Norte','Lunda Sul','Malanje','Moxico','Namibe','Uige','Zaire'];
+  const encarregados = DB.data.users.filter(u => u.perfil === 'encarregado');
+
+  showModal(student ? 'Editar Aluno' : 'Novo Aluno / Matricula', `
+    <div class="flex justify-center mb-4">
+      <div class="photo-upload" id="alunoPhoto" onclick="document.getElementById('alunoPhotoInput').click()">
+        ${student?.foto ? `<img src="${student.foto}">` : '<i class="fas fa-camera text-2xl text-gray-400"></i>'}
+      </div>
+      <input type="file" id="alunoPhotoInput" accept="image/*" hidden>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div><label class="text-sm font-semibold text-gray-700">Nome Completo *</label><input id="a_nome" value="${student?.nome || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Data de Nascimento *</label><input id="a_dataNasc" type="date" value="${student?.dataNascimento || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Genero *</label><select id="a_genero"><option value="">Selecione</option><option ${student?.genero === 'Masculino' ? 'selected' : ''}>Masculino</option><option ${student?.genero === 'Feminino' ? 'selected' : ''}>Feminino</option></select></div>
+      <div><label class="text-sm font-semibold text-gray-700">No do BI / Cedula</label><input id="a_bi" value="${student?.bi || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Naturalidade</label><input id="a_naturalidade" value="${student?.naturalidade || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Provincia</label><select id="a_provincia"><option value="">Selecione</option>${provincias.map(p => `<option ${student?.provincia === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Municipio</label><input id="a_municipio" value="${student?.municipio || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Bairro / Endereco</label><input id="a_endereco" value="${student?.endereco || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Nome do Pai</label><input id="a_nomePai" value="${student?.nomePai || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Nome da Mae</label><input id="a_nomeMae" value="${student?.nomeMae || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Grupo Sanguineo</label><select id="a_grupoSanguineo"><option value="">Selecione</option><option ${student?.grupoSanguineo === 'A+' ? 'selected' : ''}>A+</option><option ${student?.grupoSanguineo === 'A-' ? 'selected' : ''}>A-</option><option ${student?.grupoSanguineo === 'B+' ? 'selected' : ''}>B+</option><option ${student?.grupoSanguineo === 'B-' ? 'selected' : ''}>B-</option><option ${student?.grupoSanguineo === 'AB+' ? 'selected' : ''}>AB+</option><option ${student?.grupoSanguineo === 'AB-' ? 'selected' : ''}>AB-</option><option ${student?.grupoSanguineo === 'O+' ? 'selected' : ''}>O+</option><option ${student?.grupoSanguineo === 'O-' ? 'selected' : ''}>O-</option></select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Necessidades Especiais</label><input id="a_necessidades" value="${student?.necessidades || ''}" placeholder="Se houver"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Classe *</label><select id="a_classe"><option value="">Selecione</option>${DB.data.classes.map(c => `<option value="${c.id}" ${student?.classeId === c.id ? 'selected' : ''}>${c.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Turma *</label><select id="a_turma"><option value="">Selecione</option>${DB.data.turmas.map(t => `<option value="${t.id}" ${student?.turmaId === t.id ? 'selected' : ''}>${t.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Numero do Aluno</label><input id="a_numero" type="number" value="${student?.numero || ''}"></div>
+      <div><label class="text-sm font-semibold text-gray-700">Encarregado de Educacao</label><select id="a_encarregado"><option value="">Selecione / Nenhum</option>${encarregados.map(e => `<option value="${e.id}" ${student?.encarregadoId === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold text-gray-700">Telefone do Encarregado</label><input id="a_telEncarregado" value="${student?.telEncarregado || ''}"></div>
+    </div>
+    <div class="flex justify-end gap-3 mt-6">
+      <button class="btn-danger" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" id="btnSalvarAluno"><i class="fas fa-save mr-2"></i>${student ? 'Actualizar' : 'Matricular'}</button>
+    </div>
+  `);
+
+  let alunoPhotoData = student?.foto || null;
+  document.getElementById('alunoPhotoInput')?.addEventListener('change', async (e) => {
+    if (e.target.files[0]) {
+      alunoPhotoData = await readFileAsDataURL(e.target.files[0]);
+      document.getElementById('alunoPhoto').innerHTML = `<img src="${alunoPhotoData}">`;
+    }
+  });
+
+  document.getElementById('btnSalvarAluno')?.addEventListener('click', () => {
+    const nome = document.getElementById('a_nome').value.trim();
+    const classeId = document.getElementById('a_classe').value;
+    const turmaId = document.getElementById('a_turma').value;
+    if (!nome || !classeId || !turmaId) return showToast('Preencha nome, classe e turma!', 'error');
+
+    const data = {
+      nome,
+      dataNascimento: document.getElementById('a_dataNasc').value,
+      genero: document.getElementById('a_genero').value,
+      bi: document.getElementById('a_bi').value,
+      naturalidade: document.getElementById('a_naturalidade').value,
+      provincia: document.getElementById('a_provincia').value,
+      municipio: document.getElementById('a_municipio').value,
+      endereco: document.getElementById('a_endereco').value,
+      nomePai: document.getElementById('a_nomePai').value,
+      nomeMae: document.getElementById('a_nomeMae').value,
+      grupoSanguineo: document.getElementById('a_grupoSanguineo').value,
+      necessidades: document.getElementById('a_necessidades').value,
+      classeId, turmaId,
+      numero: document.getElementById('a_numero').value,
+      encarregadoId: document.getElementById('a_encarregado').value,
+      telEncarregado: document.getElementById('a_telEncarregado').value,
+      foto: alunoPhotoData
+    };
+
+    if (student) {
+      Object.assign(student, data);
+      showToast('Aluno actualizado com sucesso!');
+    } else {
+      data.id = DB.generateId();
+      data.dataMatricula = new Date().toISOString();
+      DB.data.students.push(data);
+      showToast('Aluno matriculado com sucesso!');
+    }
+    DB.save();
+    closeModal();
+    render();
+  });
+}
+
+// ==================== GLOBAL ACTION FUNCTIONS ====================
+window.editarUsuario = (id) => { const u = DB.data.users.find(x => x.id === id); if(u) openUserModal(u.perfil, id); };
+window.verUsuario = (id) => {
+  const u = DB.data.users.find(x => x.id === id);
+  if (!u) return;
+  showModal('Detalhes do Usuario', `
+    <div class="flex items-center gap-6 mb-6">
+      ${photoOrInitials(u.foto, u.nome, 'avatar-lg')}
+      <div>
+        <h3 class="text-xl font-bold">${u.nome}</h3>
+        <span class="badge badge-info">${getPerfilLabel(u.perfil)}</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div><span class="text-gray-500">BI:</span> <span class="font-semibold">${u.bi || '-'}</span></div>
+      <div><span class="text-gray-500">Data Nasc.:</span> <span class="font-semibold">${formatDate(u.dataNascimento)}</span></div>
+      <div><span class="text-gray-500">Genero:</span> <span class="font-semibold">${u.genero || '-'}</span></div>
+      <div><span class="text-gray-500">Estado Civil:</span> <span class="font-semibold">${u.estadoCivil || '-'}</span></div>
+      <div><span class="text-gray-500">Naturalidade:</span> <span class="font-semibold">${u.naturalidade || '-'}</span></div>
+      <div><span class="text-gray-500">Provincia:</span> <span class="font-semibold">${u.provincia || '-'}</span></div>
+      <div><span class="text-gray-500">Municipio:</span> <span class="font-semibold">${u.municipio || '-'}</span></div>
+      <div><span class="text-gray-500">Telefone:</span> <span class="font-semibold">${u.telefone || '-'}</span></div>
+      <div><span class="text-gray-500">Email:</span> <span class="font-semibold">${u.email || '-'}</span></div>
+      <div><span class="text-gray-500">Habilitacoes:</span> <span class="font-semibold">${u.habilitacoes || '-'}</span></div>
+      <div><span class="text-gray-500">Area Formacao:</span> <span class="font-semibold">${u.areaFormacao || '-'}</span></div>
+      <div><span class="text-gray-500">No Agente:</span> <span class="font-semibold">${u.numAgente || '-'}</span></div>
+      <div><span class="text-gray-500">IBAN:</span> <span class="font-semibold">${u.iban || '-'}</span></div>
+      <div><span class="text-gray-500">Endereco:</span> <span class="font-semibold">${u.endereco || '-'}</span></div>
+      <div><span class="text-gray-500">Username:</span> <span class="font-semibold">${u.username}</span></div>
+      <div><span class="text-gray-500">Data Criacao:</span> <span class="font-semibold">${formatDate(u.dataCriacao)}</span></div>
+    </div>
+  `, '600px');
+};
+window.toggleUsuario = (id) => {
+  const u = DB.data.users.find(x => x.id === id);
+  if (u) { u.ativo = !u.ativo; DB.save(); render(); showToast(`Usuario ${u.ativo ? 'activado' : 'desactivado'}.`); }
+};
+window.editarAluno = (id) => openStudentModal(id);
+window.verAluno = (id) => {
+  const a = DB.data.students.find(x => x.id === id);
+  if (!a) return;
+  const classe = DB.data.classes.find(c => c.id === a.classeId);
+  const turma = DB.data.turmas.find(t => t.id === a.turmaId);
+  const enc = DB.data.users.find(u => u.id === a.encarregadoId);
+  showModal('Ficha do Aluno', `
+    <div class="flex items-center gap-6 mb-6">
+      ${photoOrInitials(a.foto, a.nome, 'avatar-lg')}
+      <div>
+        <h3 class="text-xl font-bold">${a.nome}</h3>
+        <p class="text-gray-500">${classe?.nome || '-'} - ${turma?.nome || '-'}</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div><span class="text-gray-500">No:</span> <span class="font-semibold">${a.numero || '-'}</span></div>
+      <div><span class="text-gray-500">Data Nasc.:</span> <span class="font-semibold">${formatDate(a.dataNascimento)}</span></div>
+      <div><span class="text-gray-500">Genero:</span> <span class="font-semibold">${a.genero || '-'}</span></div>
+      <div><span class="text-gray-500">BI/Cedula:</span> <span class="font-semibold">${a.bi || '-'}</span></div>
+      <div><span class="text-gray-500">Naturalidade:</span> <span class="font-semibold">${a.naturalidade || '-'}</span></div>
+      <div><span class="text-gray-500">Provincia:</span> <span class="font-semibold">${a.provincia || '-'}</span></div>
+      <div><span class="text-gray-500">Municipio:</span> <span class="font-semibold">${a.municipio || '-'}</span></div>
+      <div><span class="text-gray-500">Bairro:</span> <span class="font-semibold">${a.endereco || '-'}</span></div>
+      <div><span class="text-gray-500">Nome do Pai:</span> <span class="font-semibold">${a.nomePai || '-'}</span></div>
+      <div><span class="text-gray-500">Nome da Mae:</span> <span class="font-semibold">${a.nomeMae || '-'}</span></div>
+      <div><span class="text-gray-500">Grupo Sanguineo:</span> <span class="font-semibold">${a.grupoSanguineo || '-'}</span></div>
+      <div><span class="text-gray-500">Necessidades Esp.:</span> <span class="font-semibold">${a.necessidades || 'Nenhuma'}</span></div>
+      <div><span class="text-gray-500">Encarregado:</span> <span class="font-semibold">${enc?.nome || '-'}</span></div>
+      <div><span class="text-gray-500">Tel. Encarregado:</span> <span class="font-semibold">${a.telEncarregado || enc?.telefone || '-'}</span></div>
+      <div><span class="text-gray-500">Data Matricula:</span> <span class="font-semibold">${formatDate(a.dataMatricula)}</span></div>
+    </div>
+  `, '600px');
+};
+window.eliminarAluno = (id) => {
+  if (!confirm('Tem certeza que deseja eliminar este aluno?')) return;
+  DB.data.students = DB.data.students.filter(s => s.id !== id);
+  DB.save(); render(); showToast('Aluno eliminado.');
+};
+
+// Classes
+window.editarClasse = (id) => {
+  const c = DB.data.classes.find(x => x.id === id);
+  showModal('Editar Classe', `
+    <div class="space-y-4">
+      <div><label class="text-sm font-semibold">Nome da Classe</label><input id="ec_nome" value="${c.nome}"></div>
+      <div><label class="text-sm font-semibold">Nivel de Ensino</label><select id="ec_nivel"><option ${c.nivel === 'Primario' ? 'selected' : ''}>Primario</option><option ${c.nivel === 'I Ciclo' ? 'selected' : ''}>I Ciclo</option><option ${c.nivel === 'II Ciclo' ? 'selected' : ''}>II Ciclo</option></select></div>
+      <button class="btn-primary" onclick="salvarEdicaoClasse('${c.id}')"><i class="fas fa-save mr-2"></i>Salvar</button>
+    </div>`, '400px');
+};
+window.salvarEdicaoClasse = (id) => {
+  const c = DB.data.classes.find(x => x.id === id);
+  c.nome = document.getElementById('ec_nome').value;
+  c.nivel = document.getElementById('ec_nivel').value;
+  DB.save(); closeModal(); render(); showToast('Classe actualizada!');
+};
+window.eliminarClasse = (id) => { if(confirm('Eliminar classe?')){DB.data.classes = DB.data.classes.filter(c=>c.id!==id);DB.save();render();showToast('Classe eliminada.');} };
+
+// Turmas
+window.editarTurma = (id) => {
+  const t = DB.data.turmas.find(x => x.id === id);
+  showModal('Editar Turma', `
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="text-sm font-semibold">Nome</label><input id="et_nome" value="${t.nome}"></div>
+      <div><label class="text-sm font-semibold">Classe</label><select id="et_classe">${DB.data.classes.map(c=>`<option value="${c.id}" ${t.classeId===c.id?'selected':''}>${c.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold">Turno</label><select id="et_turno">${DB.data.turnos.map(tn=>`<option value="${tn.id}" ${t.turnoId===tn.id?'selected':''}>${tn.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold">Sala</label><input id="et_sala" value="${t.sala||''}"></div>
+      <div><label class="text-sm font-semibold">Capacidade</label><input id="et_cap" type="number" value="${t.capacidade||''}"></div>
+    </div>
+    <button class="btn-primary mt-4" onclick="salvarEdicaoTurma('${t.id}')"><i class="fas fa-save mr-2"></i>Salvar</button>
+  `, '500px');
+};
+window.salvarEdicaoTurma = (id) => {
+  const t = DB.data.turmas.find(x=>x.id===id);
+  t.nome = document.getElementById('et_nome').value;
+  t.classeId = document.getElementById('et_classe').value;
+  t.turnoId = document.getElementById('et_turno').value;
+  t.sala = document.getElementById('et_sala').value;
+  t.capacidade = document.getElementById('et_cap').value;
+  DB.save(); closeModal(); render(); showToast('Turma actualizada!');
+};
+window.eliminarTurma = (id) => { if(confirm('Eliminar turma?')){DB.data.turmas=DB.data.turmas.filter(t=>t.id!==id);DB.save();render();showToast('Turma eliminada.');} };
+
+// Turnos
+window.editarTurno = (id) => {
+  const t = DB.data.turnos.find(x => x.id === id);
+  showModal('Editar Turno', `
+    <div class="space-y-4">
+      <div><label class="text-sm font-semibold">Nome</label><input id="etn_nome" value="${t.nome}"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-sm font-semibold">Hora Inicio</label><input id="etn_hi" type="time" value="${t.horaInicio||''}"></div>
+        <div><label class="text-sm font-semibold">Hora Fim</label><input id="etn_hf" type="time" value="${t.horaFim||''}"></div>
+      </div>
+      <button class="btn-primary" onclick="salvarEdicaoTurno('${t.id}')"><i class="fas fa-save mr-2"></i>Salvar</button>
+    </div>`, '400px');
+};
+window.salvarEdicaoTurno = (id) => {
+  const t = DB.data.turnos.find(x=>x.id===id);
+  t.nome = document.getElementById('etn_nome').value;
+  t.horaInicio = document.getElementById('etn_hi').value;
+  t.horaFim = document.getElementById('etn_hf').value;
+  DB.save(); closeModal(); render(); showToast('Turno actualizado!');
+};
+window.eliminarTurno = (id) => { if(confirm('Eliminar turno?')){DB.data.turnos=DB.data.turnos.filter(t=>t.id!==id);DB.save();render();showToast('Turno eliminado.');} };
+
+// Disciplinas
+window.editarDisciplina = (id) => {
+  const d = DB.data.disciplinas.find(x=>x.id===id);
+  const profs = DB.data.users.filter(u=>u.perfil==='professor');
+  showModal('Editar Disciplina', `
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="text-sm font-semibold">Nome</label><input id="ed_nome" value="${d.nome}"></div>
+      <div><label class="text-sm font-semibold">Classe</label><select id="ed_classe">${DB.data.classes.map(c=>`<option value="${c.id}" ${d.classeId===c.id?'selected':''}>${c.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold">Turma</label><select id="ed_turma">${DB.data.turmas.map(t=>`<option value="${t.id}" ${d.turmaId===t.id?'selected':''}>${t.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold">Professor</label><select id="ed_prof"><option value="">Nao atribuido</option>${profs.map(p=>`<option value="${p.id}" ${d.professorId===p.id?'selected':''}>${p.nome}</option>`).join('')}</select></div>
+      <div><label class="text-sm font-semibold">Carga Horaria (h/sem)</label><input id="ed_ch" type="number" value="${d.cargaHoraria||''}"></div>
+    </div>
+    <button class="btn-primary mt-4" onclick="salvarEdicaoDisciplina('${d.id}')"><i class="fas fa-save mr-2"></i>Salvar</button>
+  `, '500px');
+};
+window.salvarEdicaoDisciplina = (id) => {
+  const d = DB.data.disciplinas.find(x=>x.id===id);
+  d.nome = document.getElementById('ed_nome').value;
+  d.classeId = document.getElementById('ed_classe').value;
+  d.turmaId = document.getElementById('ed_turma').value;
+  d.professorId = document.getElementById('ed_prof').value;
+  d.cargaHoraria = document.getElementById('ed_ch').value;
+  DB.save(); closeModal(); render(); showToast('Disciplina actualizada!');
+};
+window.eliminarDisciplina = (id) => { if(confirm('Eliminar disciplina?')){DB.data.disciplinas=DB.data.disciplinas.filter(d=>d.id!==id);DB.save();render();showToast('Disciplina eliminada.');} };
+
+// Trimestres
+window.abrirTrimestre = (n) => {
+  DB.data.trimestres.forEach(t => t.ativo = false);
+  let t = DB.data.trimestres.find(tr => tr.numero === n);
+  if (!t) { t = { numero: n, inicio: '', fim: '', ativo: true }; DB.data.trimestres.push(t); }
+  else t.ativo = true;
+  DB.save(); render(); showToast(`${n}o Trimestre aberto!`);
+};
+window.fecharTrimestre = (n) => {
+  const t = DB.data.trimestres.find(tr => tr.numero === n);
+  if (t) t.ativo = false;
+  DB.save(); render(); showToast(`${n}o Trimestre fechado.`);
+};
+
+// Notas
+window.carregarAlunosNota = () => {
+  const discId = document.getElementById('notaDisciplina')?.value;
+  const trimestre = parseInt(document.getElementById('notaTrimestre')?.value) || 1;
+  if (!discId) return;
+  const disc = DB.data.disciplinas.find(d => d.id === discId);
+  if (!disc) return;
+  const alunos = DB.data.students.filter(s => s.turmaId === disc.turmaId);
+  const container = document.getElementById('notasContainer');
+  if (alunos.length === 0) { container.innerHTML = '<p class="text-gray-400 text-center py-4">Nenhum aluno nesta turma.</p>'; return; }
+  container.innerHTML = `
+    <table><thead><tr><th>No</th><th>Aluno</th><th>MAC</th><th>PP</th><th>PT</th><th>Media Trim.</th></tr></thead><tbody>
+      ${alunos.map((a, i) => {
+        const nota = DB.data.notas.find(n => n.alunoId === a.id && n.disciplinaId === discId && n.trimestre === trimestre);
+        return `<tr>
+          <td>${i + 1}</td>
+          <td class="font-semibold">${a.nome}</td>
+          <td><input type="number" min="0" max="20" class="!w-16 !p-1 text-center nota-input" data-aluno="${a.id}" data-field="mac" value="${nota?.mac || ''}"></td>
+          <td><input type="number" min="0" max="20" class="!w-16 !p-1 text-center nota-input" data-aluno="${a.id}" data-field="pp" value="${nota?.pp || ''}"></td>
+          <td><input type="number" min="0" max="20" class="!w-16 !p-1 text-center nota-input" data-aluno="${a.id}" data-field="pt" value="${nota?.pt || ''}"></td>
+          <td class="font-bold media-cell" id="media_${a.id}">${nota ? ((parseFloat(nota.mac||0) + parseFloat(nota.pp||0) + parseFloat(nota.pt||0)) / 3).toFixed(1) : '-'}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>
+    <button class="btn-success mt-4" id="btnSalvarNotas"><i class="fas fa-save mr-2"></i>Salvar Notas</button>
+  `;
+
+  // Calculate media on input change
+  container.querySelectorAll('.nota-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const alunoId = input.dataset.aluno;
+      const row = input.closest('tr');
+      const inputs = row.querySelectorAll('.nota-input');
+      const vals = Array.from(inputs).map(i => parseFloat(i.value) || 0);
+      const media = vals.reduce((a, b) => a + b, 0) / 3;
+      document.getElementById(`media_${alunoId}`).textContent = media.toFixed(1);
+    });
+  });
+
+  document.getElementById('btnSalvarNotas')?.addEventListener('click', () => {
+    const rows = container.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll('.nota-input');
+      const alunoId = inputs[0]?.dataset.aluno;
+      if (!alunoId) return;
+      const mac = parseFloat(inputs[0].value) || null;
+      const pp = parseFloat(inputs[1].value) || null;
+      const pt = parseFloat(inputs[2].value) || null;
+      let nota = DB.data.notas.find(n => n.alunoId === alunoId && n.disciplinaId === discId && n.trimestre === trimestre);
+      if (nota) { nota.mac = mac; nota.pp = pp; nota.pt = pt; }
+      else { DB.data.notas.push({ id: DB.generateId(), alunoId, disciplinaId: discId, trimestre, mac, pp, pt, data: new Date().toISOString() }); }
+    });
+    DB.save();
+    showToast('Notas salvas com sucesso!');
+  });
+};
+
+// Presencas
+window.carregarPresencas = () => {
+  const discId = document.getElementById('presencaDisciplina')?.value;
+  const data = document.getElementById('presencaData')?.value;
+  if (!discId || !data) return showToast('Selecione disciplina e data!', 'warning');
+  const disc = DB.data.disciplinas.find(d => d.id === discId);
+  if (!disc) return;
+  const alunos = DB.data.students.filter(s => s.turmaId === disc.turmaId);
+  const container = document.getElementById('presencaContainer');
+  container.innerHTML = `
+    <table><thead><tr><th>No</th><th>Aluno</th><th>Presente</th><th>Falta</th><th>Justificada</th></tr></thead><tbody>
+      ${alunos.map((a, i) => {
+        const pres = DB.data.presencas.find(p => p.alunoId === a.id && p.disciplinaId === discId && p.data === data);
+        return `<tr>
+          <td>${i+1}</td>
+          <td>${a.nome}</td>
+          <td><input type="radio" name="pres_${a.id}" value="P" ${!pres || pres.estado === 'P' ? 'checked' : ''} data-aluno="${a.id}"></td>
+          <td><input type="radio" name="pres_${a.id}" value="F" ${pres?.estado === 'F' ? 'checked' : ''} data-aluno="${a.id}"></td>
+          <td><input type="radio" name="pres_${a.id}" value="FJ" ${pres?.estado === 'FJ' ? 'checked' : ''} data-aluno="${a.id}"></td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>
+    <button class="btn-success mt-4" onclick="salvarPresencas('${discId}','${data}')"><i class="fas fa-save mr-2"></i>Salvar Presencas</button>
+  `;
+};
+
+window.salvarPresencas = (discId, data) => {
+  document.querySelectorAll(`input[type="radio"]:checked`).forEach(input => {
+    const alunoId = input.dataset.aluno;
+    if (!alunoId) return;
+    let pres = DB.data.presencas.find(p => p.alunoId === alunoId && p.disciplinaId === discId && p.data === data);
+    if (pres) pres.estado = input.value;
+    else DB.data.presencas.push({ id: DB.generateId(), alunoId, disciplinaId: discId, data, estado: input.value });
+  });
+  DB.save();
+  showToast('Presencas salvas!');
+};
+
+// Pauta
+window.carregarPauta = () => {
+  const classeId = document.getElementById('pautaClasse')?.value;
+  const turmaId = document.getElementById('pautaTurma')?.value;
+  if (!classeId) return;
+  let alunos = DB.data.students.filter(s => s.classeId === classeId);
+  if (turmaId) alunos = alunos.filter(s => s.turmaId === turmaId);
+  const disciplinas = DB.data.disciplinas.filter(d => d.classeId === classeId && (!turmaId || d.turmaId === turmaId));
+  const container = document.getElementById('pautaContainer');
+  container.innerHTML = `
+    <div class="overflow-x-auto">
+    <table><thead><tr><th>No</th><th>Aluno</th>${disciplinas.map(d => `<th>${d.nome.substring(0, 8)}</th>`).join('')}<th>Media Geral</th><th>Resultado</th></tr></thead><tbody>
+      ${alunos.map((a, i) => {
+        let somaMedias = 0; let countMedias = 0;
+        const tds = disciplinas.map(d => {
+          const notasDisc = DB.data.notas.filter(n => n.alunoId === a.id && n.disciplinaId === d.id);
+          let mediaFinal = '-';
+          if (notasDisc.length > 0) {
+            const t1 = notasDisc.find(n => n.trimestre === 1);
+            const t2 = notasDisc.find(n => n.trimestre === 2);
+            const t3 = notasDisc.find(n => n.trimestre === 3);
+            const m1 = t1 ? (t1.mac + t1.pp + t1.pt) / 3 : null;
+            const m2 = t2 ? (t2.mac + t2.pp + t2.pt) / 3 : null;
+            const m3 = t3 ? (t3.mac + t3.pp + t3.pt) / 3 : null;
+            const medias = [m1, m2, m3].filter(m => m !== null);
+            if (medias.length > 0) { mediaFinal = (medias.reduce((a,b) => a+b) / medias.length).toFixed(1); somaMedias += parseFloat(mediaFinal); countMedias++; }
+          }
+          return `<td class="${parseFloat(mediaFinal) < 10 ? 'text-red-600 font-bold' : ''}">${mediaFinal}</td>`;
+        }).join('');
+        const mediaGeral = countMedias > 0 ? (somaMedias / countMedias).toFixed(1) : '-';
+        const resultado = parseFloat(mediaGeral) >= 10 ? '<span class="badge badge-success">Aprovado</span>' : mediaGeral !== '-' ? '<span class="badge badge-danger">Reprovado</span>' : '-';
+        return `<tr><td>${i+1}</td><td class="font-semibold">${a.nome}</td>${tds}<td class="font-bold">${mediaGeral}</td><td>${resultado}</td></tr>`;
+      }).join('')}
+    </tbody></table></div>
+  `;
+};
+
+window.exportarPautaPDF = () => {
+  const classeId = document.getElementById('pautaClasse')?.value;
+  if (!classeId) return showToast('Selecione uma classe primeiro!', 'warning');
+  const classe = DB.data.classes.find(c => c.id === classeId);
+  const alunos = DB.data.students.filter(s => s.classeId === classeId);
+  exportToPDF(`Pauta - ${classe?.nome || ''}`, ['No', 'Aluno', 'Media', 'Resultado'],
+    alunos.map((a, i) => [i+1, a.nome, '-', '-']));
+};
+
+// Documentos
+window.emitirDocumento = (tipo) => {
+  const container = document.getElementById('docFormContainer');
+  container.innerHTML = `
+    <div class="border rounded-xl p-6">
+      <h4 class="font-bold mb-4">${tipo === 'declaracao' ? 'Emitir Declaracao' : tipo === 'boletim' ? 'Emitir Boletim de Notas' : 'Emitir Certificado'}</h4>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-sm font-semibold">Selecionar Aluno</label>
+          <select id="doc_aluno"><option value="">Selecione</option>${DB.data.students.map(s => `<option value="${s.id}">${s.nome}</option>`).join('')}</select>
+        </div>
+      </div>
+      <button class="btn-primary mt-4" onclick="gerarDocFinal('${tipo}')"><i class="fas fa-file-pdf mr-2"></i>Gerar PDF</button>
+    </div>
+  `;
+};
+
+window.gerarDocFinal = (tipo) => {
+  const alunoId = document.getElementById('doc_aluno')?.value;
+  if (!alunoId) return showToast('Selecione um aluno!', 'warning');
+  const aluno = DB.data.students.find(s => s.id === alunoId);
+  const classe = DB.data.classes.find(c => c.id === aluno.classeId);
+  const turma = DB.data.turmas.find(t => t.id === aluno.turmaId);
+
+  const data = {
+    nome: aluno.nome,
+    bi: aluno.bi,
+    dataNascimento: formatDate(aluno.dataNascimento),
+    naturalidade: aluno.naturalidade,
+    provincia: aluno.provincia,
+    classe: classe?.nome,
+    turma: turma?.nome,
+    nivel: classe?.nivel,
+    notas: []
+  };
+
+  if (tipo === 'boletim') {
+    const disciplinas = DB.data.disciplinas.filter(d => d.turmaId === aluno.turmaId);
+    data.notas = disciplinas.map(d => {
+      const n1 = DB.data.notas.find(n => n.alunoId === alunoId && n.disciplinaId === d.id && n.trimestre === 1);
+      const n2 = DB.data.notas.find(n => n.alunoId === alunoId && n.disciplinaId === d.id && n.trimestre === 2);
+      const n3 = DB.data.notas.find(n => n.alunoId === alunoId && n.disciplinaId === d.id && n.trimestre === 3);
+      return {
+        disciplina: d.nome,
+        t1: n1 ? ((n1.mac + n1.pp + n1.pt) / 3).toFixed(1) : null,
+        t2: n2 ? ((n2.mac + n2.pp + n2.pt) / 3).toFixed(1) : null,
+        t3: n3 ? ((n3.mac + n3.pp + n3.pt) / 3).toFixed(1) : null,
+      };
+    });
+  }
+  generateDocument(tipo, data);
+};
+
+// Messages
+window.lerMensagem = (id) => {
+  const msg = DB.data.mensagens.find(m => m.id === id);
+  if (!msg) return;
+  msg.lida = true;
+  DB.save();
+  const remetente = DB.data.users.find(u => u.id === msg.de);
+  showModal('Mensagem', `
+    <div class="mb-4">
+      <p class="text-sm text-gray-500">De: <span class="font-semibold text-gray-700">${remetente?.nome || 'Sistema'}</span></p>
+      <p class="text-sm text-gray-500">Data: ${formatDate(msg.data)}</p>
+    </div>
+    <h4 class="font-bold text-lg mb-3">${msg.assunto}</h4>
+    <div class="bg-gray-50 rounded-lg p-4 text-gray-700 whitespace-pre-wrap">${msg.corpo}</div>
+  `, '500px');
+  render();
+};
+
+// Filter Alunos
+window.filterAlunos = () => {
+  const search = document.getElementById('searchAluno')?.value?.toLowerCase() || '';
+  const classeFilter = document.getElementById('filterClasse')?.value || '';
+  const turmaFilter = document.getElementById('filterTurma')?.value || '';
+  document.querySelectorAll('#tabelaAlunos tbody tr').forEach(row => {
+    const nome = row.dataset.nome || '';
+    const classe = row.dataset.classe || '';
+    const turma = row.dataset.turma || '';
+    const show = nome.includes(search) && (!classeFilter || classe === classeFilter) && (!turmaFilter || turma === turmaFilter);
+    row.style.display = show ? '' : 'none';
+  });
+};
+
+// Exports
+window.exportUsuariosXLS = () => {
+  exportToXLS(DB.data.users.map(u => ({ Nome: u.nome, Perfil: getPerfilLabel(u.perfil), BI: u.bi, Telefone: u.telefone, Email: u.email, Provincia: u.provincia })), 'Usuarios');
+};
+window.exportProfessoresXLS = () => {
+  exportToXLS(DB.data.users.filter(u => u.perfil === 'professor').map(p => ({ Nome: p.nome, BI: p.bi, Habilitacoes: p.habilitacoes, Telefone: p.telefone, Email: p.email, NumAgente: p.numAgente })), 'Professores');
+};
+window.exportProfessoresPDF = () => {
+  const profs = DB.data.users.filter(u => u.perfil === 'professor');
+  exportToPDF('Lista de Professores', ['Nome', 'BI', 'Habilitacoes', 'Telefone', 'No Agente'],
+    profs.map(p => [p.nome, p.bi, p.habilitacoes, p.telefone, p.numAgente]));
+};
+window.exportAlunosXLS = () => {
+  exportToXLS(DB.data.students.map(a => {
+    const c = DB.data.classes.find(cl => cl.id === a.classeId);
+    const t = DB.data.turmas.find(tu => tu.id === a.turmaId);
+    return { Nome: a.nome, Classe: c?.nome, Turma: t?.nome, Genero: a.genero, DataNasc: a.dataNascimento, Provincia: a.provincia, NomePai: a.nomePai, NomeMae: a.nomeMae };
+  }), 'Alunos');
+};
+window.exportAlunosPDF = () => {
+  exportToPDF('Lista de Alunos', ['No', 'Nome', 'Classe', 'Turma', 'Genero'],
+    DB.data.students.map((a, i) => {
+      const c = DB.data.classes.find(cl => cl.id === a.classeId);
+      const t = DB.data.turmas.find(tu => tu.id === a.turmaId);
+      return [i+1, a.nome, c?.nome, t?.nome, a.genero];
+    }));
+};
+
+// Backup
+window.fazerBackup = () => {
+  const blob = new Blob([JSON.stringify(DB.data, null, 2)], { type: 'application/json' });
+  saveAs(blob, `backup_nkalambata_${new Date().toISOString().split('T')[0]}.json`);
+  showToast('Backup realizado com sucesso!');
+};
+window.restaurarBackup = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      DB.data = JSON.parse(e.target.result);
+      DB.save();
+      showToast('Backup restaurado com sucesso!');
+      currentUser = null;
+      render();
+    } catch(err) { showToast('Ficheiro invalido!', 'error'); }
+  };
+  reader.readAsText(file);
+};
+window.exportarTudoXLS = () => {
+  const wb = XLSX.utils.book_new();
+  if (DB.data.users.length) {
+    const ws1 = XLSX.utils.json_to_sheet(DB.data.users.map(u => ({ Nome: u.nome, Perfil: getPerfilLabel(u.perfil), BI: u.bi, Telefone: u.telefone, Email: u.email })));
+    XLSX.utils.book_append_sheet(wb, ws1, 'Usuarios');
+  }
+  if (DB.data.students.length) {
+    const ws2 = XLSX.utils.json_to_sheet(DB.data.students.map(a => ({ Nome: a.nome, Classe: DB.data.classes.find(c=>c.id===a.classeId)?.nome, Turma: DB.data.turmas.find(t=>t.id===a.turmaId)?.nome, Genero: a.genero })));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Alunos');
+  }
+  XLSX.writeFile(wb, 'Nkalambata_Dados_Completos.xlsx');
+  showToast('Exportacao completa realizada!');
+};
+
+// Relatorios
+window.gerarRelatorio = (tipo) => {
+  if (tipo === 'alunos_classe') {
+    const headers = ['No', 'Nome', 'Classe', 'Turma', 'Genero', 'Data Nasc.'];
+    const rows = DB.data.students.map((a, i) => [i+1, a.nome, DB.data.classes.find(c=>c.id===a.classeId)?.nome, DB.data.turmas.find(t=>t.id===a.turmaId)?.nome, a.genero, formatDate(a.dataNascimento)]);
+    exportToPDF('Relatorio de Alunos por Classe', headers, rows);
+  } else if (tipo === 'professores') {
+    exportProfessoresPDF();
+  } else if (tipo === 'estatisticas') {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Complexo Escolar Nkalambata', 105, 20, { align: 'center' });
+    doc.setFontSize(14);
+    doc.text('Relatorio de Estatisticas Gerais', 105, 30, { align: 'center' });
+    doc.setFontSize(11);
+    let y = 50;
+    const stats = [
+      ['Total de Alunos', DB.data.students.length],
+      ['Total de Professores', DB.data.users.filter(u=>u.perfil==='professor').length],
+      ['Total de Classes', DB.data.classes.length],
+      ['Total de Turmas', DB.data.turmas.length],
+      ['Total de Disciplinas', DB.data.disciplinas.length],
+      ['Ano Lectivo', DB.data.anoLetivo?.nome || 'N/D'],
+      ['Alunos Masculinos', DB.data.students.filter(s=>s.genero==='Masculino').length],
+      ['Alunos Femininos', DB.data.students.filter(s=>s.genero==='Feminino').length],
+    ];
+    stats.forEach(([label, value]) => {
+      doc.text(`${label}: ${value}`, 20, y);
+      y += 10;
+    });
+    doc.save('Estatisticas_Gerais.pdf');
+    showToast('Relatorio gerado!');
+  }
+};
+
+// ==================== MAIN EVENT BINDINGS ====================
+function bindMainEvents() {
+  // Sidebar navigation
+  document.querySelectorAll('.menu-item[data-page]').forEach(item => {
+    item.addEventListener('click', () => {
+      currentPage = item.dataset.page;
+      render();
+    });
+  });
+
+  // Toggle sidebar
+  document.getElementById('toggleSidebar')?.addEventListener('click', () => {
+    sidebarCollapsed = !sidebarCollapsed;
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth <= 768) {
+      sidebar.classList.toggle('mobile-open');
+    } else {
+      sidebar.classList.toggle('collapsed');
+    }
+  });
+
+  // Logout
+  document.getElementById('btnLogout')?.addEventListener('click', () => {
+    currentUser = null;
+    currentPage = 'dashboard';
+    render();
+    showToast('Sessao encerrada.');
+  });
+
+  // Notification icon
+  document.getElementById('notifIcon')?.addEventListener('click', () => {
+    currentPage = 'comunicacao';
+    render();
+  });
+
+  // Ano Letivo
+  document.getElementById('btnSalvarAno')?.addEventListener('click', () => {
+    const nome = document.getElementById('anoNome').value.trim();
+    if (!nome) return showToast('Defina o nome do ano lectivo!', 'error');
+    DB.data.anoLetivo = {
+      nome,
+      inicio: document.getElementById('anoInicio').value,
+      fim: document.getElementById('anoFim').value,
+      ativo: true
+    };
+    DB.save(); render(); showToast('Ano lectivo salvo!');
+  });
+  document.getElementById('btnFecharAno')?.addEventListener('click', () => {
+    if (confirm('Fechar o ano lectivo? Isto impedira lancamento de notas.')) {
+      DB.data.anoLetivo.ativo = false;
+      DB.data.trimestres.forEach(t => t.ativo = false);
+      DB.save(); render(); showToast('Ano lectivo fechado.');
+    }
+  });
+  document.getElementById('btnReabrirAno')?.addEventListener('click', () => {
+    DB.data.anoLetivo.ativo = true;
+    DB.save(); render(); showToast('Ano lectivo reaberto.');
+  });
+
+  // Trimestres
+  document.getElementById('btnSalvarTrimestre')?.addEventListener('click', () => {
+    const num = parseInt(document.getElementById('triNum').value);
+    const inicio = document.getElementById('triInicio').value;
+    const fim = document.getElementById('triFim').value;
+    let t = DB.data.trimestres.find(tr => tr.numero === num);
+    if (t) { t.inicio = inicio; t.fim = fim; }
+    else { DB.data.trimestres.push({ numero: num, inicio, fim, ativo: false }); }
+    DB.save(); render(); showToast('Trimestre configurado!');
+  });
+
+  // Novo Usuario
+  document.getElementById('btnNovoUsuario')?.addEventListener('click', () => openUserModal('professor'));
+
+  // Nova Classe
+  document.getElementById('btnNovaClasse')?.addEventListener('click', () => {
+    showModal('Nova Classe', `
+      <div class="space-y-4">
+        <div><label class="text-sm font-semibold">Nome da Classe *</label><input id="nc_nome" placeholder="Ex: 1a Classe"></div>
+        <div><label class="text-sm font-semibold">Nivel de Ensino</label><select id="nc_nivel"><option>Primario</option><option>I Ciclo</option><option>II Ciclo</option></select></div>
+        <button class="btn-primary" id="btnSalvarClasse"><i class="fas fa-save mr-2"></i>Criar Classe</button>
+      </div>
+    `, '400px');
+    document.getElementById('btnSalvarClasse')?.addEventListener('click', () => {
+      const nome = document.getElementById('nc_nome').value.trim();
+      if (!nome) return showToast('Defina o nome!', 'error');
+      DB.data.classes.push({ id: DB.generateId(), nome, nivel: document.getElementById('nc_nivel').value });
+      DB.save(); closeModal(); render(); showToast('Classe criada!');
+    });
+  });
+
+  // Nova Turma
+  document.getElementById('btnNovaTurma')?.addEventListener('click', () => {
+    showModal('Nova Turma', `
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-sm font-semibold">Nome *</label><input id="nt_nome" placeholder="Ex: A"></div>
+        <div><label class="text-sm font-semibold">Classe *</label><select id="nt_classe"><option value="">Selecione</option>${DB.data.classes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+        <div><label class="text-sm font-semibold">Turno</label><select id="nt_turno"><option value="">Selecione</option>${DB.data.turnos.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}</select></div>
+        <div><label class="text-sm font-semibold">Sala</label><input id="nt_sala" placeholder="Ex: Sala 1"></div>
+        <div><label class="text-sm font-semibold">Capacidade</label><input id="nt_cap" type="number" placeholder="40"></div>
+      </div>
+      <button class="btn-primary mt-4" id="btnSalvarTurmaModal"><i class="fas fa-save mr-2"></i>Criar Turma</button>
+    `, '500px');
+    document.getElementById('btnSalvarTurmaModal')?.addEventListener('click', () => {
+      const nome = document.getElementById('nt_nome').value.trim();
+      const classeId = document.getElementById('nt_classe').value;
+      if (!nome || !classeId) return showToast('Preencha nome e classe!', 'error');
+      DB.data.turmas.push({ id: DB.generateId(), nome, classeId, turnoId: document.getElementById('nt_turno').value, sala: document.getElementById('nt_sala').value, capacidade: document.getElementById('nt_cap').value });
+      DB.save(); closeModal(); render(); showToast('Turma criada!');
+    });
+  });
+
+  // Novo Turno
+  document.getElementById('btnNovoTurno')?.addEventListener('click', () => {
+    showModal('Novo Turno', `
+      <div class="space-y-4">
+        <div><label class="text-sm font-semibold">Nome *</label><input id="ntn_nome" placeholder="Ex: Manha"></div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="text-sm font-semibold">Hora Inicio</label><input id="ntn_hi" type="time" value="07:00"></div>
+          <div><label class="text-sm font-semibold">Hora Fim</label><input id="ntn_hf" type="time" value="12:30"></div>
+        </div>
+        <button class="btn-primary" id="btnSalvarTurnoModal"><i class="fas fa-save mr-2"></i>Criar Turno</button>
+      </div>
+    `, '400px');
+    document.getElementById('btnSalvarTurnoModal')?.addEventListener('click', () => {
+      const nome = document.getElementById('ntn_nome').value.trim();
+      if (!nome) return showToast('Defina o nome!', 'error');
+      DB.data.turnos.push({ id: DB.generateId(), nome, horaInicio: document.getElementById('ntn_hi').value, horaFim: document.getElementById('ntn_hf').value });
+      DB.save(); closeModal(); render(); showToast('Turno criado!');
+    });
+  });
+
+  // Nova Disciplina
+  document.getElementById('btnNovaDisciplina')?.addEventListener('click', () => {
+    const profs = DB.data.users.filter(u => u.perfil === 'professor');
+    showModal('Nova Disciplina', `
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-sm font-semibold">Nome *</label><input id="nd_nome" placeholder="Ex: Matematica"></div>
+        <div><label class="text-sm font-semibold">Classe *</label><select id="nd_classe"><option value="">Selecione</option>${DB.data.classes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+        <div><label class="text-sm font-semibold">Turma</label><select id="nd_turma"><option value="">Selecione</option>${DB.data.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}</select></div>
+        <div><label class="text-sm font-semibold">Professor</label><select id="nd_prof"><option value="">Nao atribuido</option>${profs.map(p => `<option value="${p.id}">${p.nome}</option>`).join('')}</select></div>
+        <div><label class="text-sm font-semibold">Carga Horaria (h/sem)</label><input id="nd_ch" type="number" placeholder="4"></div>
+      </div>
+      <button class="btn-primary mt-4" id="btnSalvarDiscModal"><i class="fas fa-save mr-2"></i>Criar Disciplina</button>
+    `, '500px');
+    document.getElementById('btnSalvarDiscModal')?.addEventListener('click', () => {
+      const nome = document.getElementById('nd_nome').value.trim();
+      if (!nome) return showToast('Defina o nome!', 'error');
+      DB.data.disciplinas.push({
+        id: DB.generateId(), nome,
+        classeId: document.getElementById('nd_classe').value,
+        turmaId: document.getElementById('nd_turma').value,
+        professorId: document.getElementById('nd_prof').value,
+        cargaHoraria: document.getElementById('nd_ch').value
+      });
+      DB.save(); closeModal(); render(); showToast('Disciplina criada!');
+    });
+  });
+
+  // Novo Aluno
+  document.getElementById('btnNovoAluno')?.addEventListener('click', () => openStudentModal());
+
+  // Nova Mensagem
+  document.getElementById('btnNovaMensagem')?.addEventListener('click', () => {
+    showModal('Nova Mensagem', `
+      <div class="space-y-4">
+        <div><label class="text-sm font-semibold">Destinatario</label>
+          <select id="msg_tipo" onchange="document.getElementById('msg_user_div').style.display=this.value==='individual'?'block':'none';document.getElementById('msg_perfil_div').style.display=this.value==='perfil'?'block':'none';">
+            <option value="individual">Usuario Individual</option>
+            <option value="perfil">Grupo por Perfil</option>
+            <option value="todos">Todos os Usuarios</option>
+          </select>
+        </div>
+        <div id="msg_user_div">
+          <label class="text-sm font-semibold">Selecionar Usuario</label>
+          <select id="msg_user"><option value="">Selecione</option>${DB.data.users.filter(u => u.id !== currentUser.id).map(u => `<option value="${u.id}">${u.nome} (${getPerfilLabel(u.perfil)})</option>`).join('')}</select>
+        </div>
+        <div id="msg_perfil_div" style="display:none">
+          <label class="text-sm font-semibold">Selecionar Perfil</label>
+          <select id="msg_perfil"><option value="professor">Professores</option><option value="encarregado">Encarregados</option><option value="secretaria">Secretaria</option><option value="subdirector_ped">Subdirector Pedagogico</option><option value="subdirector_adm">Subdirector Administrativo</option></select>
+        </div>
+        <div><label class="text-sm font-semibold">Assunto *</label><input id="msg_assunto" placeholder="Assunto da mensagem"></div>
+        <div><label class="text-sm font-semibold">Mensagem *</label><textarea id="msg_corpo" rows="5" placeholder="Escreva a sua mensagem..."></textarea></div>
+        <button class="btn-primary" id="btnEnviarMsg"><i class="fas fa-paper-plane mr-2"></i>Enviar</button>
+      </div>
+    `, '500px');
+    document.getElementById('btnEnviarMsg')?.addEventListener('click', () => {
+      const tipo = document.getElementById('msg_tipo').value;
+      const assunto = document.getElementById('msg_assunto').value.trim();
+      const corpo = document.getElementById('msg_corpo').value.trim();
+      if (!assunto || !corpo) return showToast('Preencha assunto e mensagem!', 'error');
+      const msg = { id: DB.generateId(), de: currentUser.id, assunto, corpo, data: new Date().toISOString(), lida: false };
+      if (tipo === 'individual') {
+        const userId = document.getElementById('msg_user').value;
+        if (!userId) return showToast('Selecione um destinatario!', 'error');
+        msg.para = userId;
+        DB.data.mensagens.push(msg);
+      } else if (tipo === 'perfil') {
+        msg.paraPerfil = document.getElementById('msg_perfil').value;
+        DB.data.mensagens.push(msg);
+      } else {
+        msg.paraTodos = true;
+        DB.data.mensagens.push(msg);
+      }
+      DB.save(); closeModal(); render(); showToast('Mensagem enviada com sucesso!');
+    });
+  });
+
+  // Novo Evento
+  document.getElementById('btnNovoEvento')?.addEventListener('click', () => {
+    showModal('Novo Evento / Aviso', `
+      <div class="space-y-4">
+        <div><label class="text-sm font-semibold">Titulo *</label><input id="ev_titulo" placeholder="Titulo do evento"></div>
+        <div><label class="text-sm font-semibold">Tipo</label><select id="ev_tipo"><option value="info">Informacao</option><option value="aviso">Aviso</option><option value="urgente">Urgente</option></select></div>
+        <div><label class="text-sm font-semibold">Data</label><input id="ev_data" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+        <div><label class="text-sm font-semibold">Descricao</label><textarea id="ev_desc" rows="4" placeholder="Descricao do evento..."></textarea></div>
+        <button class="btn-primary" id="btnSalvarEvento"><i class="fas fa-save mr-2"></i>Publicar</button>
+      </div>
+    `, '500px');
+    document.getElementById('btnSalvarEvento')?.addEventListener('click', () => {
+      const titulo = document.getElementById('ev_titulo').value.trim();
+      if (!titulo) return showToast('Defina o titulo!', 'error');
+      DB.data.eventos.push({
+        id: DB.generateId(),
+        titulo,
+        tipo: document.getElementById('ev_tipo').value,
+        data: document.getElementById('ev_data').value,
+        descricao: document.getElementById('ev_desc').value,
+        criadoPor: currentUser.id
+      });
+      DB.save(); closeModal(); render(); showToast('Evento publicado!');
+    });
+  });
+
+  // Configuracoes
+  document.getElementById('btnSalvarConfig')?.addEventListener('click', () => {
+    DB.data.config = DB.data.config || {};
+    DB.data.config.telefone = document.getElementById('cfgTelefone').value;
+    DB.data.config.email = document.getElementById('cfgEmail').value;
+    DB.data.config.endereco = document.getElementById('cfgEndereco').value;
+    DB.save(); showToast('Configuracoes salvas!');
+  });
+  document.getElementById('btnAlterarSenha')?.addEventListener('click', () => {
+    const nova = document.getElementById('novaSenha').value;
+    const conf = document.getElementById('confSenha').value;
+    if (!nova || nova.length < 6) return showToast('Senha deve ter minimo 6 caracteres!', 'error');
+    if (nova !== conf) return showToast('Senhas nao coincidem!', 'error');
+    const u = DB.data.users.find(x => x.id === currentUser.id);
+    if (u) { u.password = nova; currentUser.password = nova; DB.save(); showToast('Senha alterada com sucesso!'); }
+  });
+
+  // Horarios - Add Aula
+  document.getElementById('btnAddHorario')?.addEventListener('click', () => {
+    const turmaId = document.getElementById('horarioTurma')?.value;
+    if (!turmaId) return showToast('Selecione uma turma!', 'warning');
+    const discs = DB.data.disciplinas.filter(d => d.turmaId === turmaId);
+    showModal('Adicionar Aula ao Horario', `
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-sm font-semibold">Dia da Semana</label><select id="h_dia"><option>Segunda</option><option>Terca</option><option>Quarta</option><option>Quinta</option><option>Sexta</option></select></div>
+        <div><label class="text-sm font-semibold">Hora</label><input id="h_hora" type="time" value="07:30"></div>
+        <div><label class="text-sm font-semibold">Disciplina</label><select id="h_disc"><option value="">Selecione</option>${discs.map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>
+        <div><label class="text-sm font-semibold">Duracao (min)</label><input id="h_dur" type="number" value="45"></div>
+      </div>
+      <button class="btn-primary mt-4" onclick="salvarHorarioAula('${turmaId}')"><i class="fas fa-save mr-2"></i>Adicionar</button>
+    `, '400px');
+  });
+}
+
+window.salvarHorarioAula = (turmaId) => {
+  const dia = document.getElementById('h_dia').value;
+  const hora = document.getElementById('h_hora').value;
+  const discId = document.getElementById('h_disc').value;
+  const duracao = document.getElementById('h_dur').value;
+  if (!discId) return showToast('Selecione uma disciplina!', 'error');
+  DB.data.horarios.push({ id: DB.generateId(), turmaId, dia, hora, disciplinaId: discId, duracao });
+  DB.save(); closeModal(); render(); showToast('Aula adicionada ao horario!');
+};
+
+window.carregarHorario = () => {
+  const turmaId = document.getElementById('horarioTurma')?.value;
+  if (!turmaId) return;
+  const horarios = DB.data.horarios.filter(h => h.turmaId === turmaId);
+  const dias = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta'];
+  const horas = [...new Set(horarios.map(h => h.hora))].sort();
+  const container = document.getElementById('horarioContainer');
+  if (horas.length === 0) { container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma aula no horario desta turma.</p>'; return; }
+  container.innerHTML = `<div class="overflow-x-auto"><table><thead><tr><th>Hora</th>${dias.map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>
+    ${horas.map(hora => `<tr><td class="font-semibold">${hora}</td>${dias.map(dia => {
+      const aula = horarios.find(h => h.hora === hora && h.dia === dia);
+      const disc = aula ? DB.data.disciplinas.find(d => d.id === aula.disciplinaId) : null;
+      return `<td class="${disc ? 'bg-blue-50' : ''}">${disc ? `<span class="text-xs font-semibold text-blue-700">${disc.nome}</span>` : '-'}</td>`;
+    }).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
+};
+
+// ==================== NETWORK STATUS ====================
+window.addEventListener('online', () => {
+  showToast('Conectado! Sincronizando dados...', 'info');
+  DB.syncToFirebase();
+  render();
+});
+window.addEventListener('offline', () => {
+  showToast('Sem conexao. Modo offline activado.', 'warning');
+  render();
+});
+
+// ==================== INITIAL RENDER ====================
+render();
+DB.loadFromFirebase();
+</script>
+</body>
 </html>
